@@ -7,6 +7,7 @@
 
 #include <zmq.hpp>
 #include <zmq_utils.h> 
+#include <gpf/util/portpool.hpp>
 
 namespace gpf{
 
@@ -29,6 +30,25 @@ namespace gpf{
 		// to the queues.
 	};
 
+	struct engine_info
+	{
+		std::string control;
+		std::string mux;
+		std::string task;
+		std::string iopub;
+		std::string heartbeat[2];
+	};
+
+	struct client_info
+	{
+		std::string control;
+		std::string mux;
+		std::string task;
+		std::string task_scheme;
+		std::string iopub;
+		std::string notification;
+	};
+
 	class hub_factory{
 		public:
 			boost::shared_ptr<hub> get();
@@ -36,7 +56,11 @@ namespace gpf{
 			hub_factory& ip(const std::string&);
 			hub_factory& transport(const std::string&);
 
+			hub_factory(int startport);
+
+
 		private:
+			portpool m_portpool;
 
 			zmq::context_t m_ctx;
 
@@ -56,12 +80,18 @@ namespace gpf{
 			std::string m_client_ip;
 
 			// ports
-			int m_mon_port;
-			int m_notifier_port;
-			int m_reg_port;
+			ports_t m_hb_ports;     // XREQ/SUB Port pair for Engine heartbeats
+			ports_t m_mux_ports;     // Engine/Client Port pair for MUX queue
+			ports_t m_task_ports;    // Engine/Client Port pair for Task queue
+			ports_t m_control_ports; // Engine/Client Port pair for Control queue
+			ports_t m_iopub_ports;   // Engine/Client Port pair for IOPub relay
+			port_t m_mon_port;      // Monitor (UB) port for queue traffic
+			port_t m_notifier_port; // PUB port for sending engine status notifications
+			port_t m_reg_port;      // For registration
+
+			// heart monitor
 
 
-			
 	};
 	
 };
