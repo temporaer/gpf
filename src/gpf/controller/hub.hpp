@@ -4,6 +4,7 @@
 #include <boost/function.hpp>
 #include <boost/utility.hpp>
 #include <boost/shared_ptr.hpp>
+#include <boost/uuid/uuid.hpp>
 #include <string>
 #include <map>
 
@@ -35,13 +36,28 @@ namespace gpf{
 		std::string notification;
 	};
 
+	struct engine_connector{
+		int id; ///< engine id
+		std::string queue; ///< zmq socket identity
+		std::string registration; ///< ???
+		std::string control; ///< ??? from `queue'
+		std::string heartbeat; ///< heart's name
+	};
+
+	struct registration_info{
+		int               eid;  // engine id
+		std::string       queue;  // zmq socket identity
+		std::string       name;  // what the sender wants to be called
+		boost::shared_ptr<deadline_timer> deletion_callback; // should be canceled when registration succeeded with a heartbeat
+	};
+
 
 	class hub
 	: boost::noncopyable
 	{
 	public:
 		hub( 
-				zmq_reactor::reactor& m_loop,
+				zmq_reactor::reactor& loop,
 				boost::shared_ptr<zmq::socket_t> monitor,
 				boost::shared_ptr<zmq::socket_t> query,
 				boost::shared_ptr<zmq::socket_t> notifier,
@@ -57,8 +73,8 @@ namespace gpf{
 		void dispatch_query(zmq::socket_t&); // requests from client
 
 		// Heartbeat
-		void handle_new_heart(zmq::socket_t&);
-		void handle_heart_failure(zmq::socket_t&);
+		void handle_new_heart(const std::string& heart);
+		void handle_heart_failure(const std::string& heart);
 
 		typedef ZmqMessage::Incoming<ZmqMessage::SimpleRouting> incoming_msg_t;
 
@@ -79,9 +95,11 @@ namespace gpf{
 		void connection_request(std::vector<std::string>&,int msg_start,incoming_msg_t&);
 		void register_engine(std::vector<std::string>&,int msg_start,incoming_msg_t&);
 		void unregister_engine(std::vector<std::string>&,int msg_start,incoming_msg_t&);
-		void _handle_stranded_msgs(const std::string& eid, const std::string& uuid);
 		void finish_registration(const std::string& heart);
+
+		void _handle_stranded_msgs(const std::string& eid, const std::string& uuid);
 		void _purge_stalled_registration(const std::string& heart);
+		void _unregister_engine(const std::string& heart, int eid );
 
 		// client requests
 		void shutdown_request(std::vector<std::string>&,int msg_start,incoming_msg_t&);
@@ -101,6 +119,15 @@ namespace gpf{
 		std::map<std::string,query_handler_t>   m_query_handlers;
 
 		int m_registration_timeout;
+
+		zmq_reactor::reactor&          m_loop;
+		boost::shared_ptr<heartmonitor> m_heartmonitor;
+		int next_id();
+		std::map<int,engine_connector> m_engines;
+		std::map<std::string,int>      m_hearts;
+		std::map<std::string,registration_info>   m_incoming_registrations;
+		std::map<std::string,int>      m_by_ident;
+		std::set<int>                  m_ids;
 
 
 	};
