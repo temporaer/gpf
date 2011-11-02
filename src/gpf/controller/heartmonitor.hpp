@@ -59,6 +59,9 @@ namespace gpf
 
 		/// get beating interval in ms
 		inline int interval()const{return m_interval; }
+
+		/// check whether this heart is alive
+		inline bool alive(const std::string& h){ return m_hearts.find(h)!=m_hearts.end(); }
 		private:
 
 		int m_interval; ///< in milliseconds
