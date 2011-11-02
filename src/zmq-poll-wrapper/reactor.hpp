@@ -63,6 +63,9 @@ namespace zmq_reactor
 			typedef boost::function<void (reactor*)>         timeout_callback_t;
 
 			void add(const gpf::deadline_timer& dt){
+			       	m_timer_queue.queue.push(boost::shared_ptr<gpf::deadline_timer>(new gpf::deadline_timer(dt)));
+			}
+			void add(boost::shared_ptr<gpf::deadline_timer> dt){
 			       	m_timer_queue.queue.push(dt);
 			}
 			bool add(socket_t& v, short event, socket_activity_callback_t cb, bool checkIfSocketAddedTwice = true)

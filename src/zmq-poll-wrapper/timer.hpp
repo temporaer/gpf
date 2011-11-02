@@ -18,6 +18,7 @@ namespace gpf
 		typedef boost::function<void (zmq_reactor::reactor*)> callback_t;
 		boost::posix_time::ptime m_deadline;
 		callback_t               m_callback;
+		bool                     m_active;
 
 		/**
 		 * construct a deadline_timer using a deadline
@@ -25,6 +26,7 @@ namespace gpf
 		deadline_timer(const boost::posix_time::ptime& deadline, callback_t cb)
 			: m_deadline(deadline)
 			, m_callback(cb)
+			, m_active(true)
 		{ 
 		}
 
@@ -34,8 +36,11 @@ namespace gpf
 		deadline_timer(const boost::posix_time::time_duration& waiting_time, callback_t cb)
 			: m_deadline(boost::posix_time::microsec_clock::universal_time()+waiting_time)
 			, m_callback(cb)
+			, m_active(true)
 		{ 
 		}
+
+		inline void set_inactive(bool b=true){ m_active = !b; }
 
 		/**
 		 * return how long we have to wait until this event fires
@@ -61,7 +66,8 @@ namespace gpf
 		 * fire event
 		 */
 		inline void fire(zmq_reactor::reactor* r)const{
-			m_callback(r);
+			if(m_active)
+				m_callback(r);
 		}
 
 		/**
@@ -75,7 +81,16 @@ namespace gpf
 
 	/// stores multiple timers in order and can check whether one of them is "due"
 	struct timer_queue{
-		std::priority_queue<deadline_timer> queue;      ///< stores all dealine_timers in order
+		typedef boost::shared_ptr<deadline_timer> deadline_timer_ptr;
+		template<class T>
+		struct ptr_less{
+			bool operator()(const boost::shared_ptr<T>& lhs, const boost::shared_ptr<T>& rhs)const{
+				return *lhs < *rhs;
+			}
+		};
+		
+		/// stores all deadline_timers in order
+		std::priority_queue<deadline_timer_ptr, std::vector<deadline_timer_ptr>, ptr_less<deadline_timer> > queue;      
 
 		/**
 		 * returns the number of microseconds to wait before next timeout
@@ -86,7 +101,7 @@ namespace gpf
 		long next_timeout(){ 
 			if(queue.empty())
 				return -1;
-			return queue.top().get_timeout().total_microseconds(); }
+			return queue.top()->get_timeout().total_microseconds(); }
 
 		/**
 		 * fires all events which are due currently
@@ -95,8 +110,8 @@ namespace gpf
 		void fire_due(zmq_reactor::reactor* r){
 			if(queue.empty()) return;
 			boost::posix_time::ptime now = boost::posix_time::microsec_clock::universal_time();
-			while(!queue.empty() && queue.top().is_due(now)){
-				queue.top().fire(r);
+			while(!queue.empty() && queue.top()->is_due(now)){
+				queue.top()->fire(r);
 				queue.pop();
 			}
 		}
