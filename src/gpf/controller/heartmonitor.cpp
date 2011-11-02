@@ -26,12 +26,14 @@ heart::heart(const std::string& in_addr, const std::string& out_addr,
 	m_out_addr(out_addr),
 	m_in_type(in_type),
 	m_out_type(out_type),
-	m_ctx(1)
+	m_ctx(1),
+	m_count(0)
 {
 }
 
 void 
 heart::bumm(zmq::socket_t& sub, zmq::socket_t* rep){
+	m_count ++;
 	ZmqMessage::Incoming<ZmqMessage::SimpleRouting> in(sub);
 	ZmqMessage::Outgoing<ZmqMessage::XRouting> out(
 			ZmqMessage::OutOptions(*rep,
@@ -66,9 +68,10 @@ heart::operator()(){
 	while(1) r(10);
 }
 
-heartmonitor::heartmonitor(heartmonitor::loop_type& loop, boost::shared_ptr<zmq::socket_t> pub, boost::shared_ptr<zmq::socket_t> router)
+heartmonitor::heartmonitor(heartmonitor::loop_type& loop, boost::shared_ptr<zmq::socket_t> pub, boost::shared_ptr<zmq::socket_t> router, int interval)
 :
- m_pub(pub)
+ m_interval(interval)
+,m_pub(pub)
 ,m_router(router)
 ,m_lifetime (microsec_clock::universal_time())
 ,m_tic      (microsec_clock::universal_time())
@@ -78,7 +81,7 @@ heartmonitor::heartmonitor(heartmonitor::loop_type& loop, boost::shared_ptr<zmq:
 
 	m_pub   ->setsockopt(ZMQ_IDENTITY, "heartMonitor_pub",strlen("heartMonitor_pub"));
 	m_router->setsockopt(ZMQ_IDENTITY, "heartMonitor_rout",strlen("heartMonitor_rout"));
-	// TODO: set up regular timeout in loop
+	loop.add(gpf::deadline_timer(boost::posix_time::milliseconds(m_interval), boost::bind(&heartmonitor::beat,this,_1)));
 }
 void heartmonitor::handle_pong (zmq::socket_t& s){
 	// a heart just beat (s==m_router)
@@ -103,7 +106,10 @@ void heartmonitor::handle_pong (zmq::socket_t& s){
 	}
 }
 
-void heartmonitor::beat(){
+void heartmonitor::beat(heartmonitor::loop_type* r){
+	// re-register callback
+	r->add(gpf::deadline_timer(boost::posix_time::milliseconds(m_interval), boost::bind(&heartmonitor::beat,this,_1)));
+
 	VLOG(2)<<"Heartmonitor:: beating.";
 	m_last_ping = m_lifetime;
 	ptime toc   = microsec_clock::universal_time();

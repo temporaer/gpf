@@ -17,6 +17,7 @@ namespace gpf
 		int         m_in_type;
 		int         m_out_type;
 		zmq::context_t m_ctx;
+		long        m_count;
 		// receives pings in a SUB socket
 		// sends out pongs through a DEALER
 		heart(const std::string& in_addr, const std::string& out_addr,
@@ -24,21 +25,23 @@ namespace gpf
 				int in_type=ZMQ_SUB, int out_type=ZMQ_DEALER);
 		void operator()();
 		void bumm(zmq::socket_t&, zmq::socket_t* );
+		inline long count(){ return m_count; }
 	};
 	class heartmonitor{
-		typedef zmq_reactor::reactor<> loop_type;
+		typedef zmq_reactor::reactor loop_type;
 
 		// sends out pings over a PUB socket
 		// receives pongs through a ROUTER
 
 		public:
-		heartmonitor(loop_type& loop, boost::shared_ptr<zmq::socket_t> pub, boost::shared_ptr<zmq::socket_t> route);
+		/// construct a heartmonitor
+		heartmonitor(loop_type& loop, boost::shared_ptr<zmq::socket_t> pub, boost::shared_ptr<zmq::socket_t> route, int interval=2000);
 
 		/// a heart just beat
 		void handle_pong (zmq::socket_t& );
 
-		/// send out pings
-		void beat();
+		/// send out pings and re-register callbacks
+		void beat(loop_type*);
 
 		/// a new heart sent a beat
 		void handle_new_heart(const std::string&);
@@ -47,6 +50,8 @@ namespace gpf
 		void handle_heart_failure(const std::string&);
 
 		private:
+
+		int m_interval; ///< in milliseconds
 
 		boost::shared_ptr<zmq::socket_t> m_pub;    // outbound traffic
 		boost::shared_ptr<zmq::socket_t> m_router; // inbound traffic
