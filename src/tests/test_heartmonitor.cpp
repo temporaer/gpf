@@ -19,7 +19,7 @@ struct body{
 };
 
 TEST(heartmonitor_test, init){
-	typedef zmq_reactor::reactor<> loop_type;
+	typedef zmq_reactor::reactor loop_type;
 
 	zmq::context_t ctx(1);
 	loop_type loop;

@@ -12,7 +12,7 @@ using boost::format;
 
 // Hub constructor
 hub::hub(
-				zmq_reactor::reactor<>& m_loop,
+				zmq_reactor::reactor& m_loop,
 				boost::shared_ptr<zmq::socket_t> monitor,
 				boost::shared_ptr<zmq::socket_t> query,
 				boost::shared_ptr<zmq::socket_t> notifier,

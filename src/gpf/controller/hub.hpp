@@ -41,7 +41,7 @@ namespace gpf{
 	{
 	public:
 		hub( 
-				zmq_reactor::reactor<>& m_loop,
+				zmq_reactor::reactor& m_loop,
 				boost::shared_ptr<zmq::socket_t> monitor,
 				boost::shared_ptr<zmq::socket_t> query,
 				boost::shared_ptr<zmq::socket_t> notifier,
@@ -147,7 +147,7 @@ namespace gpf{
 			boost::shared_ptr<heartmonitor> m_heartmonitor;
 
 			// reactor
-			zmq_reactor::reactor<> m_reactor;
+			zmq_reactor::reactor m_reactor;
 	};
 	
 };
