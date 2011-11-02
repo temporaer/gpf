@@ -63,8 +63,12 @@ void url::parse(const string& url_s)
 }
 
 
-bool validate_url(const std::string& url){
-	
+bool validate_url(const std::string& u){
+	try{
+		gpf::url tmp(u);
+	}catch(...){
+		return false;
+	}
 	return true;
 }
 
