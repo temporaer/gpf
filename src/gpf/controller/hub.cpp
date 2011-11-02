@@ -17,10 +17,13 @@ hub::hub(
 				boost::shared_ptr<zmq::socket_t> query,
 				boost::shared_ptr<zmq::socket_t> notifier,
 				boost::shared_ptr<zmq::socket_t> resubmit,
+				boost::shared_ptr<heartmonitor> hm,
 				engine_info ei,
 				client_info ci
 		)
 {
+
+	m_registration_timeout =  std::max(5000, 2*hm->interval());
 
 	m_loop.add(*query,    ZMQ_POLLIN, boost::bind(&hub::dispatch_query,this, _1));
 	m_loop.add(*monitor,  ZMQ_POLLIN, boost::bind(&hub::dispatch_monitor_traffic,this, _1));
@@ -265,7 +268,7 @@ hub_factory::get(){
 	const char* session_name = "session-name";
 	r->setsockopt(ZMQ_IDENTITY, session_name, strlen(session_name));
 	r->connect(ci.task.c_str());
-	boost::shared_ptr<hub> H( new hub(m_reactor, sub, q, n, r,ei,ci));
+	boost::shared_ptr<hub> H( new hub(m_reactor, sub, q, n, r,m_heartmonitor, ei,ci));
 
 	return H;
 }

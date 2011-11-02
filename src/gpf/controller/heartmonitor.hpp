@@ -57,6 +57,8 @@ namespace gpf
 		/// register a handler for failed hearts
 		inline void register_failed_heart_handler(const callback_t& cb){ m_failed_heart_callbacks.push_back(cb); }
 
+		/// get beating interval in ms
+		inline int interval()const{return m_interval; }
 		private:
 
 		int m_interval; ///< in milliseconds

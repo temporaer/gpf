@@ -46,6 +46,7 @@ namespace gpf{
 				boost::shared_ptr<zmq::socket_t> query,
 				boost::shared_ptr<zmq::socket_t> notifier,
 				boost::shared_ptr<zmq::socket_t> resubmit,
+				boost::shared_ptr<heartmonitor> hm,
 				engine_info ei,
 				client_info ci
 		);
@@ -98,6 +99,8 @@ namespace gpf{
 		typedef void (hub::*query_handler_t)(std::vector<std::string>&,int msg_start,incoming_msg_t&);
 		std::map<std::string,monitor_handler_t> m_monitor_handlers;
 		std::map<std::string,query_handler_t>   m_query_handlers;
+
+		int m_registration_timeout;
 
 
 	};
