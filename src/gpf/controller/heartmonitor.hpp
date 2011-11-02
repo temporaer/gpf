@@ -27,8 +27,10 @@ namespace gpf
 		void bumm(zmq::socket_t&, zmq::socket_t* );
 		inline long count(){ return m_count; }
 	};
+
 	class heartmonitor{
 		typedef zmq_reactor::reactor loop_type;
+		typedef boost::function<void(const std::string&)> callback_t;
 
 		// sends out pings over a PUB socket
 		// receives pongs through a ROUTER
@@ -49,6 +51,12 @@ namespace gpf
 		/// a heart failed to send a beat
 		void handle_heart_failure(const std::string&);
 
+		/// register a handler for new hearts
+		inline void register_new_heart_handler(const callback_t& cb){ m_new_heart_callbacks.push_back(cb); }
+		
+		/// register a handler for failed hearts
+		inline void register_failed_heart_handler(const callback_t& cb){ m_failed_heart_callbacks.push_back(cb); }
+
 		private:
 
 		int m_interval; ///< in milliseconds
@@ -63,6 +71,9 @@ namespace gpf
 		std::set<std::string> m_hearts;
 		std::set<std::string> m_responses;
 		std::set<std::string> m_on_probation;
+
+		std::vector<callback_t> m_failed_heart_callbacks;
+		std::vector<callback_t> m_new_heart_callbacks;
 	};
 }
 #endif /* __HEARTMONITOR_HPP__ */

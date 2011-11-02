@@ -152,11 +152,13 @@ void heartmonitor::beat(heartmonitor::loop_type* r){
 
 void heartmonitor::handle_new_heart(const std::string& heart){
 	VLOG(2) << "Heartbeat: got new heart `"<<heart<<"'";
-	// TODO: register and call handlers
+	BOOST_FOREACH(const callback_t& cb, m_new_heart_callbacks)
+		cb(heart);
 	m_hearts.insert(heart);
 }
 void heartmonitor::handle_heart_failure(const std::string& heart){
 	LOG(WARNING) << "Heartbeat: heart `"<<heart<<"' just failed!";
-	// TODO: register and call handlers
+	BOOST_FOREACH(const callback_t& cb, m_failed_heart_callbacks)
+		cb(heart);
 	m_hearts.erase(heart);
 }
