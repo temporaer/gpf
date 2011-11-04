@@ -23,6 +23,8 @@ hub::hub(
 		)
 :m_loop(loop)
 ,m_heartmonitor(hm)
+,m_engine_info(ei)
+,m_client_info(ci)
 {
 	m_registration_timeout =  std::max(5000, 2*hm->interval());
 
@@ -52,8 +54,21 @@ hub::hub(
 	m_query_handlers["connection_request"]     = &hub::connection_request;
 
 	
-	hm->register_new_heart_handler(boost::bind(&hub::handle_new_heart,this,_1));
+	hm->register_new_heart_handler(   boost::bind(&hub::handle_new_heart    ,this,_1));
 	hm->register_failed_heart_handler(boost::bind(&hub::handle_heart_failure,this,_1));
+
+	DLOG_IF(FATAL, !validate_url(ci.control));
+	DLOG_IF(FATAL, !validate_url(ci.mux));
+	DLOG_IF(FATAL, !validate_url(ci.task));
+	DLOG_IF(FATAL, !validate_url(ci.iopub));
+	DLOG_IF(FATAL, !validate_url(ci.notification));
+
+	DLOG_IF(FATAL, !validate_url(ei.control));
+	DLOG_IF(FATAL, !validate_url(ei.mux));
+	DLOG_IF(FATAL, !validate_url(ei.task));
+	DLOG_IF(FATAL, !validate_url(ei.iopub));
+	DLOG_IF(FATAL, !validate_url(ei.heartbeat[0]));
+	DLOG_IF(FATAL, !validate_url(ei.heartbeat[1]));
 
 	LOG(INFO)<<"hub::created hub";
 }
