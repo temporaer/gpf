@@ -14,9 +14,11 @@
 #include <gpf/controller/heartmonitor.hpp>
 #include <zmq-poll-wrapper/reactor.hpp>
 #include <gpf/util/zmqmessage.hpp>
+#include <gpf/util/message_util.hpp>
 #include <gpf/message.hpp>
 
 namespace gpf{
+
 	struct engine_info
 	{
 		std::string control;
@@ -85,25 +87,25 @@ namespace gpf{
 		void handle_new_heart(const std::string& heart);
 		void handle_heart_failure(const std::string& heart);
 
-		typedef ZmqMessage::Incoming<ZmqMessage::SimpleRouting> incoming_msg_t;
+		typedef ZmqMessage::Incoming<ZmqMessage::XRouting> incoming_msg_t;
 
 		// MUX Queue Traffic
-		void nop(std::vector<std::string>&, int msg_start, incoming_msg_t&); // TODO: should this func recv the msg nevertheless?
-		void save_queue_request(std::vector<std::string>&, int msg_start, incoming_msg_t&);
-		void save_queue_result (std::vector<std::string>&, int msg_start, incoming_msg_t&);
+		void nop(incoming_msg_t&); // TODO: should this func recv the msg nevertheless?
+		void save_queue_request(incoming_msg_t&);
+		void save_queue_result (incoming_msg_t&);
 
 		// Task Queue Traffic
-		void save_task_request(std::vector<std::string>&, int msg_start, incoming_msg_t&);
-		void save_task_result(std::vector<std::string>&, int msg_start, incoming_msg_t&);
-		void save_task_destination(std::vector<std::string>&, int msg_start, incoming_msg_t&);
+		void save_task_request(incoming_msg_t&);
+		void save_task_result(incoming_msg_t&);
+		void save_task_destination(incoming_msg_t&);
 
 		// IOPub traffic
-		void save_iopub_message(std::vector<std::string>&, int msg_start, incoming_msg_t&);
+		void save_iopub_message(incoming_msg_t&);
 
 		// registration requests
-		void connection_request(std::vector<std::string>&,int msg_start,incoming_msg_t&);
-		void register_engine(std::vector<std::string>&,int msg_start,incoming_msg_t&);
-		void unregister_engine(std::vector<std::string>&,int msg_start,incoming_msg_t&);
+		void connection_request(incoming_msg_t&);
+		void register_engine(incoming_msg_t&);
+		void unregister_engine(incoming_msg_t&);
 		void finish_registration(const std::string& heart);
 
 		void _handle_stranded_msgs(const std::string& eid, const std::string& uuid);
@@ -111,21 +113,24 @@ namespace gpf{
 		void _unregister_engine(const std::string& heart, int eid );
 
 		// client requests
-		void shutdown_request(std::vector<std::string>&,int msg_start,incoming_msg_t&);
+		void shutdown_request(incoming_msg_t&);
 		void _shutdown();
-		void check_load(std::vector<std::string>&,int msg_start,incoming_msg_t&);
-		void queue_status(std::vector<std::string>&,int msg_start,incoming_msg_t&);
-		void purge_results(std::vector<std::string>&,int msg_start,incoming_msg_t&);
-		void resubmit_task(std::vector<std::string>&,int msg_start,incoming_msg_t&);
-		//void _extract_record(std::vector<std::string>&,int msg_start,incoming_msg_t&);
-		void get_results(std::vector<std::string>&,int msg_start,incoming_msg_t&);
-		void db_query(std::vector<std::string>&,int msg_start,incoming_msg_t&);
-		void get_history(std::vector<std::string>&,int msg_start,incoming_msg_t&);
+		void check_load(incoming_msg_t&);
+		void queue_status(incoming_msg_t&);
+		void purge_results(incoming_msg_t&);
+		void resubmit_task(incoming_msg_t&);
+		//void _extract_record(incoming_msg_t&);
+		void get_results(incoming_msg_t&);
+		void db_query(incoming_msg_t&);
+		void get_history(incoming_msg_t&);
 
-		typedef void (hub::*monitor_handler_t)(std::vector<std::string>&, int msg_start, incoming_msg_t&);
-		typedef void (hub::*query_handler_t)(std::vector<std::string>&,int msg_start,incoming_msg_t&);
+		typedef void (hub::*monitor_handler_t)(incoming_msg_t&);
+		typedef void (hub::*query_handler_t)(incoming_msg_t&);
 		std::map<std::string,monitor_handler_t> m_monitor_handlers;
 		std::map<std::string,query_handler_t>   m_query_handlers;
+
+		util::serializer<util::text_archive>     m_marshal;
+		util::serializer<util::protobuf_archive> m_header_marshal;
 
 		int m_registration_timeout;
 
@@ -137,6 +142,9 @@ namespace gpf{
 		std::map<std::string,registration_info>   m_incoming_registrations;
 		std::map<std::string,int>      m_by_ident;
 		std::set<int>                  m_ids;
+
+		engine_info                    m_engine_info;
+		client_info                    m_client_info;
 
 
 	};

@@ -5,6 +5,7 @@
 
 #include <gpf/controller/hub.hpp>
 #include <gpf/util/message_util.hpp>
+#include <gpf/util/url_handling.hpp>
 
 using namespace gpf;
 using boost::format;
@@ -78,7 +79,6 @@ int hub::next_id(){
 	return id++;
 }
 void hub::finish_registration(const std::string& heart){
-	// TODO: implement
 	// Second half of engine registration, called after our HeartMonitor
 	// has received a beat from the Engine's Heart.
 	
@@ -136,16 +136,18 @@ void hub::handle_heart_failure(const std::string& heart){
 	_unregister_engine(heart,eid);
 }
 
-void hub::register_engine(std::vector<std::string>& reg,int msg_start,incoming_msg_t& imsg){
-	// TODO: decode msg content as a registration_message
+void hub::register_engine(incoming_msg_t& incoming){
 	// TODO: wrap errors in a message and send them back to client
 
 	registration_message msg;
+	if(0!=m_marshal.deserialize(msg,*incoming.iter_at<std::string>(1)))
+	        return;
+
 	std::string queue = msg.queue;
 	std::string heart = msg.heartbeat;
 
 	int eid = next_id();
-	DLOG(INFO)<<"Registration::register_engine "<<eid<<" "<<queue<<" "<<reg[0]<<" "<<heart;
+	DLOG(INFO)<<"Registration::register_engine "<<eid<<" "<<queue<<" "<<" "<<heart;
 
 	bool ok = true;
 	if(m_by_ident.find(queue) != m_by_ident.end()) {
@@ -169,7 +171,7 @@ void hub::register_engine(std::vector<std::string>& reg,int msg_start,incoming_m
 		gpf::registration_info ri;
 		ri.eid = eid;
 		ri.queue = queue;
-		ri.name  = reg[0];
+		//ri.name  = reg[0]; // TODO  should be part of Message!!!???
 		if(m_heartmonitor->alive(heart)){
 			// heart is already beating, finish off
 			m_incoming_registrations[heart] = ri;
@@ -201,91 +203,68 @@ void hub::_unregister_engine(const std::string& heart, int eid ){
 void hub::dispatch_monitor_traffic(zmq::socket_t& s){
 	// all ME and Task queue messages come through here, as well as
 	// IOPub traffic.
-	ZmqMessage::Incoming<ZmqMessage::SimpleRouting> incoming(s);
+	ZmqMessage::Incoming<ZmqMessage::XRouting> incoming(s);
 	incoming.receive_all();
 	std::string type = ZmqMessage::get<std::string>(incoming[0]);
 	DLOG(INFO) << "Monitor traffic : "<< ZmqMessage::get<std::string>(incoming[0]);
 	
-	int msg_start;
-	std::vector<std::string> idents;
-	util::feed_identities(idents,msg_start,incoming);
-	if(idents.size()==0)
-	{
-		LOG(ERROR) << "Bad Monitor Message!";
-		return;
-	}
-
 	std::map<std::string,monitor_handler_t>::iterator handler = m_monitor_handlers.find(type);
 	if(handler == m_monitor_handlers.end()){
 		LOG(ERROR) << "Invalid monitor topic: "<<type;
 		return;
 	}
-	(this->*(handler->second))(idents, msg_start, incoming);
+	(this->*(handler->second))(incoming);
 }
+
 void hub::dispatch_query(zmq::socket_t&s){
 	// Route registration requests and queries from clients.
-	ZmqMessage::Incoming<ZmqMessage::SimpleRouting> incoming(s);
-	std::vector<std::string> idents;
-	int msg_start;
-	util::feed_identities(idents,msg_start,incoming);
-	if(idents.size()==0){
-		LOG(ERROR) << "Bad Query Message! ";
-		return;
-	}
-
-	message msg;
-	try{
-		util::deserialize(msg, msg_start, incoming);
-	}catch(std::exception e){
-		LOG(ERROR) << "Bad Query Mesage: Unserialize failed!\n"<<e.what();
-	}
+	ZmqMessage::Incoming<ZmqMessage::XRouting> incoming(s);
+	incoming.receive_all();
 	
-	
-	std::map<std::string,query_handler_t>::iterator handler = m_query_handlers.find(msg.msg_type);
+	std::string type = ZmqMessage::get<std::string>(incoming[0]);
+	std::map<std::string,query_handler_t>::iterator handler = m_query_handlers.find(type);
 	if(handler == m_query_handlers.end()){
-		LOG(ERROR) << "Bad Message Type: "<<msg.msg_type;
+		LOG(ERROR) << "Bad Message Type: "<<type;
 		return;
 	}
-	(this->*(handler->second))(idents, msg_start, incoming);
-
+	(this->*(handler->second))(incoming);
 }
 
 hub::~hub()
 {
 }
 
-void hub::nop(std::vector<std::string>&, int msg_start, incoming_msg_t&){
-	// TODO: should this func recv the msg nevertheless?
+void hub::nop(incoming_msg_t&){
 }
-void hub::save_queue_request(std::vector<std::string>&, int msg_start, incoming_msg_t&){
+void hub::save_queue_request(incoming_msg_t&){
 	
 }
-void hub::save_queue_result (std::vector<std::string>&, int msg_start, incoming_msg_t&){
+void hub::save_queue_result (incoming_msg_t&){
 	
 }
-void hub::save_task_request(std::vector<std::string>&, int msg_start, incoming_msg_t&){
+void hub::save_task_request(incoming_msg_t&){
 	
 }
-void hub::save_task_result(std::vector<std::string>&, int msg_start, incoming_msg_t&){
+void hub::save_task_result(incoming_msg_t&){
 	
 }
-void hub::save_task_destination(std::vector<std::string>&, int msg_start, incoming_msg_t&){
+void hub::save_task_destination(incoming_msg_t&){
 	
 }
 
-void hub::shutdown_request(std::vector<std::string>&,int msg_start,incoming_msg_t&){}
+void hub::shutdown_request(incoming_msg_t&){}
 void hub::_shutdown(){}
-void hub::check_load(std::vector<std::string>&,int msg_start,incoming_msg_t&){}
-void hub::queue_status(std::vector<std::string>&,int msg_start,incoming_msg_t&){}
-void hub::purge_results(std::vector<std::string>&,int msg_start,incoming_msg_t&){}
-void hub::resubmit_task(std::vector<std::string>&,int msg_start,incoming_msg_t&){}
-void hub::get_results(std::vector<std::string>&,int msg_start,incoming_msg_t&){}
-void hub::db_query(std::vector<std::string>&,int msg_start,incoming_msg_t&){}
-void hub::get_history(std::vector<std::string>&,int msg_start,incoming_msg_t&){}
+void hub::check_load(incoming_msg_t&){}
+void hub::queue_status(incoming_msg_t&){}
+void hub::purge_results(incoming_msg_t&){}
+void hub::resubmit_task(incoming_msg_t&){}
+void hub::get_results(incoming_msg_t&){}
+void hub::db_query(incoming_msg_t&){}
+void hub::get_history(incoming_msg_t&){}
 
-void hub::save_iopub_message(std::vector<std::string>&, int msg_start, incoming_msg_t&){}
-void hub::connection_request(std::vector<std::string>&,int msg_start,incoming_msg_t&){}
-void hub::unregister_engine(std::vector<std::string>&,int msg_start,incoming_msg_t&){}
+void hub::save_iopub_message(incoming_msg_t&){}
+void hub::connection_request(incoming_msg_t&){}
+void hub::unregister_engine(incoming_msg_t&){}
 
  /**********************************
   *         Hub Factory
