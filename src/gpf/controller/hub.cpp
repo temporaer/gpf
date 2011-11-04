@@ -4,8 +4,10 @@
 #include <glog/logging.h>
 
 #include <gpf/controller/hub.hpp>
-#include <gpf/util/message_util.hpp>
 #include <gpf/util/url_handling.hpp>
+
+#include <gpf/serialization/protobuf.hpp>
+#include <gpf/messages/hub.pb.h>
 
 using namespace gpf;
 using boost::format;
@@ -138,31 +140,31 @@ void hub::handle_heart_failure(const std::string& heart){
 
 void hub::register_engine(incoming_msg_t& incoming){
 	// TODO: wrap errors in a message and send them back to client
+	gpf_hub::registration msg;
 
-	registration_message msg;
-	if(0!=m_marshal.deserialize(msg,*incoming.iter_at<std::string>(1)))
+	if(0!=m_header_marshal.deserialize(msg,*incoming.iter_at<std::string>(1)))
 	        return;
 
-	std::string queue = msg.queue;
-	std::string heart = msg.heartbeat;
+	std::string queue = msg.queue();
+	std::string heart = msg.heartbeat();
 
 	int eid = next_id();
 	DLOG(INFO)<<"Registration::register_engine "<<eid<<" "<<queue<<" "<<" "<<heart;
 
 	bool ok = true;
 	if(m_by_ident.find(queue) != m_by_ident.end()) {
-		LOG(ERROR)<<"Registration::queue id "<<msg.queue<<" in use!"; ok = false;
+		LOG(ERROR)<<"Registration::queue id "<<msg.queue()<<" in use!"; ok = false;
 	}
 	else if(m_hearts.find(heart)!=m_hearts.end()){
-		LOG(ERROR)<<"Registration::heart id "<<msg.heartbeat<<" in use!"; ok = false;
+		LOG(ERROR)<<"Registration::heart id "<<msg.heartbeat()<<" in use!"; ok = false;
 	}else{
 		for(std::map<std::string, gpf::registration_info>::iterator it = m_incoming_registrations.begin();
 			it!= m_incoming_registrations.end(); it++){
 			if(it->first == heart){
-				LOG(ERROR)<<"Registration::heart id "<<msg.heartbeat<<" in use!"; ok = false;
+				LOG(ERROR)<<"Registration::heart id "<<msg.heartbeat()<<" in use!"; ok = false;
 				break;
 			}else if(it->second.queue == queue){
-				LOG(ERROR)<<"Registration::queue id "<<msg.queue<<" in use!"; ok = false;
+				LOG(ERROR)<<"Registration::queue id "<<msg.queue()<<" in use!"; ok = false;
 				break;
 			}
 		}
@@ -197,7 +199,40 @@ void hub::_purge_stalled_registration(const std::string& heart){
 
 void hub::_unregister_engine(const std::string& heart, int eid ){
 	// unregister an engine (due to its own request or due to heart failure)
-	// TODO: Implement!
+	auto it = m_engines.find(eid);
+	if(it == m_engines.end()){
+		LOG(ERROR)<<"Trying to unregister non-existing engine "<<heart<<" "<<eid;
+		return;
+	}
+	m_dead_engines.insert(it->second.queue);
+	m_loop.add(deadline_timer(boost::posix_time::milliseconds(m_registration_timeout),
+				boost::bind(&hub::_handle_stranded_msgs, this, eid, it->second.queue)));
+
+	// TODO: if self.notifier: send notification
+}
+void hub::_handle_stranded_msgs(int eid, const std::string& uuid){
+	/** 
+	 * Handle messages known to be on an engine when the engine unregisters.
+	 *
+	 * It is possible that this will fire prematurely - that is, an engine
+	 * will go down after completing a result, and the client will be
+	 * notified that the result failed and later receive the actual result.
+	 */
+	engine_connector& ec = m_engines[eid];
+	std::vector<std::string>& outstanding = ec.queues;
+	BOOST_FOREACH( std::string& msg_id, outstanding ){
+		m_pending.erase(msg_id);
+		m_all_completed.insert(msg_id);
+
+		auto it = m_db.find(msg_id);
+		if(it==m_db.end()) {
+			LOG(ERROR)<<"DB error handling stranded message "<<msg_id;
+			continue;
+		}
+		it->second.set_content("Engine died while running task `" + msg_id + "'");
+		it->second.set_completed(to_iso_string(boost::posix_time::microsec_clock::universal_time()));
+		it->second.set_engine_uuid(ec.queue);
+	}
 }
 
 void hub::dispatch_monitor_traffic(zmq::socket_t& s){

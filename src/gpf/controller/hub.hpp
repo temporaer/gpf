@@ -14,8 +14,9 @@
 #include <gpf/controller/heartmonitor.hpp>
 #include <zmq-poll-wrapper/reactor.hpp>
 #include <gpf/util/zmqmessage.hpp>
-#include <gpf/util/message_util.hpp>
-#include <gpf/message.hpp>
+#include <gpf/serialization.hpp>
+#include <gpf/controller/db.hpp>
+#include <gpf/messages/hub.pb.h>
 
 namespace gpf{
 
@@ -78,6 +79,9 @@ namespace gpf{
 				client_info ci
 		);
 		~hub();
+
+		const engine_info get_engine_info()const{return m_engine_info;}
+		const client_info get_client_info()const{return m_client_info;}
 		
 	private:
 		void dispatch_monitor_traffic(zmq::socket_t&); // ME, IOPub and Task queue messages
@@ -108,7 +112,7 @@ namespace gpf{
 		void unregister_engine(incoming_msg_t&);
 		void finish_registration(const std::string& heart);
 
-		void _handle_stranded_msgs(const std::string& eid, const std::string& uuid);
+		void _handle_stranded_msgs(int eid, const std::string& uuid);
 		void _purge_stalled_registration(const std::string& heart);
 		void _unregister_engine(const std::string& heart, int eid );
 
@@ -129,8 +133,7 @@ namespace gpf{
 		std::map<std::string,monitor_handler_t> m_monitor_handlers;
 		std::map<std::string,query_handler_t>   m_query_handlers;
 
-		util::serializer<util::text_archive>     m_marshal;
-		util::serializer<util::protobuf_archive> m_header_marshal;
+		serialization::serializer<serialization::protobuf_archive> m_header_marshal;
 
 		int m_registration_timeout;
 
@@ -138,13 +141,20 @@ namespace gpf{
 		boost::shared_ptr<heartmonitor> m_heartmonitor;
 		int next_id();
 		std::map<int,engine_connector> m_engines;
+		std::set<std::string>          m_dead_engines;
 		std::map<std::string,int>      m_hearts;
 		std::map<std::string,registration_info>   m_incoming_registrations;
 		std::map<std::string,int>      m_by_ident;
 		std::set<int>                  m_ids;
 
+		// message-ids
+		std::set<std::string>          m_pending;
+		std::set<std::string>          m_all_completed;
+
 		engine_info                    m_engine_info;
 		client_info                    m_client_info;
+
+		dict_db<std::string,gpf_hub::task_record> m_db;
 
 
 	};
