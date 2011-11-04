@@ -28,7 +28,7 @@ TEST(heartmonitor_test, init){
 	   rep (new zmq::socket_t (ctx, ZMQ_ROUTER));
 	pub->bind("tcp://127.0.0.1:5555");
 	rep->bind("tcp://127.0.0.1:5556");
-	gpf::heartmonitor hm(loop, pub, rep, 200);
+	gpf::heartmonitor hm(loop, pub, rep, 400);
 
 	body b("b");
 	body c("c"), d("d");
@@ -37,7 +37,7 @@ TEST(heartmonitor_test, init){
 	boost::thread t_d(&body::run, &d);
 
 	// turn off after 10 seconds
-	loop.add(gpf::deadline_timer(boost::posix_time::milliseconds(1100), boost::bind(&loop_type::shutdown, &loop)));
+	loop.add(gpf::deadline_timer(boost::posix_time::milliseconds(2200), boost::bind(&loop_type::shutdown, &loop)));
 
 	loop.run();
 
