@@ -1,0 +1,38 @@
+package gpf_hub;
+
+message query {
+  required string msg_id = 1;
+  required string msg_type = 2;
+}
+
+message registration{
+  required string heartbeat = 1;
+  required string queue     = 2;
+}
+
+message header{
+	message key_val{
+		required string key=1;
+		optional string val=2;
+	};
+	repeated key_val kv =1;
+}
+
+message task_record{
+	required string msg_id =1;
+	required string client_uuid =2;
+	optional string engine_uuid =3;
+
+	required header headers =4;
+	required string content =5;
+	repeated string buffers =6;
+
+	required string submitted        = 7;   // date-time
+	optional string started          = 8;   // date-time
+	optional string completed        = 9;   // date-time
+	optional string resubmitted      = 10;   // date-time
+
+	optional header result_headers =11;
+	optional string result_content =12;
+	repeated string result_buffers =13;
+}

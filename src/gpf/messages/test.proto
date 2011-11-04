@@ -1,0 +1,6 @@
+package gpf_test;
+
+message msg_t {
+	required string s=1;
+	required int32  i=2;
+}
