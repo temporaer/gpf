@@ -45,5 +45,9 @@ TEST(heartmonitor_test, init){
 	EXPECT_EQ(c.heart.count(), 5);
 	EXPECT_EQ(d.heart.count(), 5);
 
+	EXPECT_TRUE(hm.alive("heartb"));
+	EXPECT_TRUE(hm.alive("heartc"));
+	EXPECT_TRUE(hm.alive("heartd"));
+
 }
 
