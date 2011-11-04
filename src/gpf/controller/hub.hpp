@@ -42,6 +42,12 @@ namespace gpf{
 		std::string registration; ///< ???
 		std::string control; ///< ??? from `queue'
 		std::string heartbeat; ///< heart's name
+
+		// stuff littering the hub class in ipython
+		std::string key; ///< queue
+		std::vector<std::string> queues; ///< ???
+		std::vector<std::string> tasks; ///< ???
+		std::vector<std::string> completed; ///< ???
 	};
 
 	struct registration_info{
@@ -49,6 +55,9 @@ namespace gpf{
 		std::string       queue;  // zmq socket identity
 		std::string       name;  // what the sender wants to be called
 		boost::shared_ptr<deadline_timer> deletion_callback; // should be canceled when registration succeeded with a heartbeat
+	};
+
+	struct engine_state{
 	};
 
 

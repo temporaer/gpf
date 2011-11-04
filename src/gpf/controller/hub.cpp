@@ -93,20 +93,19 @@ void hub::finish_registration(const std::string& heart){
 		ri.deletion_callback->set_inactive();
 
 	engine_connector ec;
-	ec.id = ri.eid;
-	ec.queue = ri.queue;
-	ec.registration = ri.name;
-	ec.control = ri.queue;
-	ec.heartbeat = heart;
+	ec.id             = ri.eid;
+	ec.queue          = ri.queue;
+	ec.registration   = ri.name;
+	ec.control        = ri.queue;
+	ec.heartbeat      = heart;
+	ec.key            = ri.queue;
 	m_engines[ri.eid] = ec;
 
-	//self.ids.add(eid)
-        //self.keytable[eid] = queue
-        //self.by_ident[queue] = eid
-        //self.queues[eid] = list()
-        //self.tasks[eid] = list()
-        //self.completed[eid] = list()
-        //self.hearts[heart] = eid
+	m_ids.insert(ri.eid);
+	m_by_ident[ri.queue] = ri.eid;
+	m_hearts[heart]   = ri.eid;
+
+	// TODO: if self.notifier... send notification to session
 
 	LOG(INFO)<<"Engine connected: "<<ri.eid;
 
