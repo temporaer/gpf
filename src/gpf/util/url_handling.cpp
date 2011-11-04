@@ -7,8 +7,8 @@
 #include <glog/logging.h>
 #include "url_handling.hpp"
 
-using namespace gpf;
 using namespace std;
+namespace gpf{
 
 url::url(const std::string& url_s){
 	parse(url_s);
@@ -72,3 +72,4 @@ bool validate_url(const std::string& u){
 	return true;
 }
 
+}
