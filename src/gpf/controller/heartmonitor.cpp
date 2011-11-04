@@ -35,11 +35,8 @@ void
 heart::bumm(zmq::socket_t& sub, zmq::socket_t* rep){
 	m_count ++;
 	ZmqMessage::Incoming<ZmqMessage::SimpleRouting> in(sub);
-	ZmqMessage::Outgoing<ZmqMessage::XRouting> out(
-			ZmqMessage::OutOptions(*rep,
-				ZmqMessage::OutOptions::NONBLOCK |  ZmqMessage::OutOptions::DROP_ON_BLOCK),
-			in);
 	in.receive_all();
+	ZmqMessage::Outgoing<ZmqMessage::XRouting> out(*rep,in,0);
 	out << m_id;
 	for (unsigned int i = 0; i < in.size(); ++i)
 		out << in[i];
