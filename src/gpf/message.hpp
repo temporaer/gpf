@@ -5,21 +5,25 @@
 
 namespace gpf
 {
-	struct message
+	struct query_message_header
 	{
-		std::map<std::string,std::string> header;
 		std::string msg_id;
 		std::string msg_type;
-		std::string parent_header; // or map????
-		std::string content;
-		// std::vector<std::string> buffers ???????
+		template<class Archive>
+		void serialize(Archive& ar, const unsigned int version){
+			ar & msg_id & msg_type;
+		}
 	};
 
 	struct registration_message
 	{
-		std::string heartbeat; // the name of the heart of an engine
-		std::string queue;     // the name of the queue of an engine
-		bool        ok;
+		std::string heartbeat; ///< the name of the heart of an engine
+		std::string queue;     ///< the name of the queue of an engine
+
+		template<class Archive>
+		void serialize(Archive& ar, const unsigned int version){
+			ar & heartbeat & queue;
+		}
 	};
 
 }
