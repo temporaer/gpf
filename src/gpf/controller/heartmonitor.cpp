@@ -7,6 +7,7 @@
 #include <boost/uuid/uuid_generators.hpp>
 #include <glog/logging.h>
 #include <gpf/util/zmqmessage.hpp>
+#include <gpf/util/url_handling.hpp>
 #include "heartmonitor.hpp"
 
 using namespace gpf;
@@ -47,6 +48,8 @@ void
 heart::operator()(){
 	zmq::socket_t sub(m_ctx, m_in_type);
 	zmq::socket_t rep(m_ctx, m_out_type);
+	LOG_IF(FATAL,!validate_url(m_out_addr));
+	LOG_IF(FATAL,!validate_url(m_in_addr));
 	rep.connect(m_out_addr.c_str());
 	sub.connect(m_in_addr.c_str());
 	if(m_in_type==ZMQ_SUB)
