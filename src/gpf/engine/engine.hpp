@@ -1,6 +1,7 @@
 #ifndef __GPF_ENGINE_HPP__
 #     define __GPF_ENGINE_HPP__
 #include <gpf/controller/hub.hpp>
+#include <gpf/serialization.hpp>
 
 namespace gpf
 {
@@ -12,6 +13,7 @@ namespace gpf
 		private:
 			zmq::context_t&      m_ctx;
 			zmq_reactor::reactor m_reactor;
+			serialization::serializer<serialization::protobuf_archive> m_header_marshal;
 	};
 }
 
