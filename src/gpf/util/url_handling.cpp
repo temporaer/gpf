@@ -16,6 +16,8 @@ url::url(const std::string& url_s){
 void url::parse(const string& url_s)
 {
     const string prot_end("://");
+    if(url_s.size()<=prot_end.size())
+	    throw std::runtime_error("Url Parser: URL too short!");
     string::const_iterator prot_i = search(url_s.begin(), url_s.end(),
                                            prot_end.begin(), prot_end.end());
     m_protocol.reserve(distance(url_s.begin(), prot_i));
