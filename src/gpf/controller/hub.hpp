@@ -84,6 +84,9 @@ namespace gpf{
 
 		const engine_info get_engine_info()const{return m_engine_info;}
 		const client_info get_client_info()const{return m_client_info;}
+		zmq_reactor::reactor& get_loop(){return m_loop;}
+
+		void run();
 		
 	private:
 		void dispatch_monitor_traffic(zmq::socket_t&); // ME, IOPub and Task queue messages

@@ -83,6 +83,10 @@ m_loop(loop)
 	LOG(INFO)<<"hub::created hub";
 }
 
+void hub::run(){
+	m_loop.run();
+}
+
 int hub::next_id(){
 	static int id = 0;
 	return id++;
