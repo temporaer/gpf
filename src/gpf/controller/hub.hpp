@@ -22,6 +22,7 @@ namespace gpf{
 
 	struct engine_info
 	{
+		std::string hub_registration;
 		std::string control;
 		std::string mux;
 		std::string task;
@@ -31,6 +32,7 @@ namespace gpf{
 
 	struct client_info
 	{
+		std::string hub_registration;
 		std::string control;
 		std::string mux;
 		std::string task;
@@ -75,8 +77,8 @@ namespace gpf{
 				boost::shared_ptr<zmq::socket_t> notifier,
 				boost::shared_ptr<zmq::socket_t> resubmit,
 				boost::shared_ptr<heartmonitor> hm,
-				engine_info ei,
-				client_info ci
+				const engine_info& ei,
+				const client_info& ci
 		);
 		~hub();
 
@@ -128,6 +130,14 @@ namespace gpf{
 		void db_query(incoming_msg_t&);
 		void get_history(incoming_msg_t&);
 
+		zmq_reactor::reactor&          m_loop;
+
+		// sockets
+		boost::shared_ptr<zmq::socket_t> m_monitor;
+		boost::shared_ptr<zmq::socket_t> m_query;
+		boost::shared_ptr<zmq::socket_t> m_notifier;
+		boost::shared_ptr<zmq::socket_t> m_resubmit;
+
 		typedef void (hub::*monitor_handler_t)(incoming_msg_t&);
 		typedef void (hub::*query_handler_t)(incoming_msg_t&);
 		std::map<std::string,monitor_handler_t> m_monitor_handlers;
@@ -137,7 +147,6 @@ namespace gpf{
 
 		int m_registration_timeout;
 
-		zmq_reactor::reactor&          m_loop;
 		boost::shared_ptr<heartmonitor> m_heartmonitor;
 		int next_id();
 		std::map<int,engine_connector> m_engines;

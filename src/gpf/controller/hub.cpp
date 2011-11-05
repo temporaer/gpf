@@ -21,10 +21,15 @@ hub::hub(
 				boost::shared_ptr<zmq::socket_t> notifier,
 				boost::shared_ptr<zmq::socket_t> resubmit,
 				boost::shared_ptr<heartmonitor> hm,
-				engine_info ei,
-				client_info ci
+				const engine_info& ei,
+				const client_info& ci
 		)
-:m_loop(loop)
+:
+m_loop(loop)
+,m_monitor(monitor)
+,m_query(query)
+,m_notifier(notifier)
+,m_resubmit(resubmit)
 ,m_heartmonitor(hm)
 ,m_engine_info(ei)
 ,m_client_info(ci)
@@ -60,12 +65,14 @@ hub::hub(
 	hm->register_new_heart_handler(   boost::bind(&hub::handle_new_heart    ,this,_1));
 	hm->register_failed_heart_handler(boost::bind(&hub::handle_heart_failure,this,_1));
 
+	DLOG_IF(FATAL, !validate_url(ci.hub_registration));
 	DLOG_IF(FATAL, !validate_url(ci.control));
 	DLOG_IF(FATAL, !validate_url(ci.mux));
 	DLOG_IF(FATAL, !validate_url(ci.task));
 	DLOG_IF(FATAL, !validate_url(ci.iopub));
 	DLOG_IF(FATAL, !validate_url(ci.notification));
 
+	DLOG_IF(FATAL, !validate_url(ei.hub_registration));
 	DLOG_IF(FATAL, !validate_url(ei.control));
 	DLOG_IF(FATAL, !validate_url(ei.mux));
 	DLOG_IF(FATAL, !validate_url(ei.task));
@@ -175,14 +182,17 @@ void hub::register_engine(incoming_msg_t& incoming){
 		ri.queue = queue;
 		//ri.name  = reg[0]; // TODO  should be part of Message!!!???
 		if(m_heartmonitor->alive(heart)){
-			// heart is already beating, finish off
+			LOG(INFO) << "heart is already beating, finish off registration";
 			m_incoming_registrations[heart] = ri;
+			finish_registration(heart);
 		}else{
 			// heart is not beating, schedule for deletion (revokable if heartbeat comes in time)
+			LOG(INFO) << "heart is not beating, wait for heartbeat to finish registration";
 			boost::shared_ptr<deadline_timer> dt(
 				new deadline_timer(boost::posix_time::milliseconds(m_registration_timeout),
 					boost::bind(&hub::_purge_stalled_registration,this,heart)));
 			ri.deletion_callback = dt;
+			m_incoming_registrations[heart] = ri;
 			m_loop.add(dt);
 		}
 		// TODO: Send some ACK message?
@@ -392,6 +402,7 @@ hub_factory::get(){
 
 	// build info structs
 	client_info ci;
+	ci.hub_registration =  str(format(client_iface) % m_reg_port);
 	ci.control      = str(format(client_iface) % m_control_ports[0]);
 	ci.mux          = str(format(client_iface) % m_mux_ports[0]);
 	ci.iopub        = str(format(client_iface) % m_iopub_ports[0]);
@@ -400,6 +411,7 @@ hub_factory::get(){
 	ci.task_scheme  = "default";
 
 	engine_info ei;
+	ei.hub_registration =  str(format(engine_iface) % m_reg_port);
 	ei.control = str(format(engine_iface) % m_control_ports[1]);
 	ei.mux     = str(format(engine_iface) % m_mux_ports[1]);
 	ei.iopub   = str(format(engine_iface) % m_iopub_ports[1]);
@@ -411,6 +423,8 @@ hub_factory::get(){
 		<< "     control " <<ei.control<<std::endl
 		<< "     mux     " <<ei.mux<<std::endl
 		<< "     iopub   " <<ei.iopub<<std::endl
+		<< "     heart0  " <<ei.heartbeat[0]<<std::endl
+		<< "     heart1  " <<ei.heartbeat[1]<<std::endl
 		<< "     task    " <<ei.task<<std::endl;
 
 	LOG(INFO)<<"Hub client addrs :"<<std::endl
