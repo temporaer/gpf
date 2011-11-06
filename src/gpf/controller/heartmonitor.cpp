@@ -62,14 +62,17 @@ heart::operator()(){
 
 	VLOG(2)<<"Heart:: Heart `"<<m_id<<"' running.";
 	
-	zmq_reactor::reactor r;
-	r.add(sub, ZMQ_POLLIN, boost::bind(&heart::bumm,this,_1,&rep));
+	m_loop.add(sub, ZMQ_POLLIN, boost::bind(&heart::bumm,this,_1,&rep));
 
 	try{
-		while(1) r(10);
+		m_loop.run();
 	}catch(zmq::error_t){
 		VLOG(2)<<"Heart::Stopped due to zmq shutdown";
 	}
+}
+
+void heart::shutdown(){
+	m_loop.shutdown();
 }
 
 heartmonitor::heartmonitor(heartmonitor::loop_type& loop, boost::shared_ptr<zmq::socket_t> pub, boost::shared_ptr<zmq::socket_t> router, int interval)

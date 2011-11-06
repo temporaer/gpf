@@ -18,6 +18,7 @@ namespace gpf
 		int         m_out_type;
 		zmq::context_t m_ctx;
 		long        m_count;
+		zmq_reactor::reactor m_loop;
 		// receives pings in a SUB socket
 		// sends out pongs through a DEALER
 		heart(const std::string& in_addr, const std::string& out_addr,
@@ -26,6 +27,7 @@ namespace gpf
 		void operator()();
 		void bumm(zmq::socket_t&, zmq::socket_t* );
 		inline long count(){ return m_count; }
+		void shutdown();
 	};
 
 	class heartmonitor{
