@@ -122,10 +122,10 @@ void hub::finish_registration(const std::string& heart){
 		msg.add_services(s);
 	{
 		ZmqMessage::Outgoing<ZmqMessage::XRouting> out(*m_notifier,0);
-		out << "register_engine"<<m_header_marshal(msg);
+		out << "registration_request"<<m_header_marshal(msg);
 	}{
 		ZmqMessage::Outgoing<ZmqMessage::XRouting> out(*m_query,*ec.incoming_msg,0);
-		out << "register_engine"<<"ACK";
+		out << "registration_request"<<"ACK";
 	}
 
 	LOG(INFO)<<"Engine connected: "<<ec.id;
