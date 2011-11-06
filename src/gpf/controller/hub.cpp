@@ -101,7 +101,10 @@ void hub::finish_registration(const std::string& heart){
 		return;
 	}
 	const engine_connector& ec = it->second;
-	LOG(INFO)<<"Finishing registration of engine "<<ec.id<<":`"<<ec.queue<<"'";
+
+	std::stringstream ss;
+	std::copy(ec.services.begin(),ec.services.end(),std::ostream_iterator<std::string>(ss,", "));
+	LOG(INFO)<<"Finishing registration of engine "<<ec.id<<":`"<<ec.queue<<"' ("<<ss.str()<<")";
 	if(ec.deletion_callback)
 		ec.deletion_callback->set_inactive();
 
