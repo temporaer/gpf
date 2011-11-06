@@ -17,6 +17,7 @@
 #include <gpf/serialization.hpp>
 #include <gpf/controller/db.hpp>
 #include <gpf/messages/hub.pb.h>
+#include <gpf/except.hpp>
 
 namespace gpf{
 
@@ -59,6 +60,7 @@ namespace gpf{
 		boost::shared_ptr<deadline_timer> deletion_callback; ///< should be canceled when registration succeeded with a heartbeat
 	};
 
+
 	class hub
 	: boost::noncopyable
 	{
@@ -78,6 +80,10 @@ namespace gpf{
 		const engine_info get_engine_info()const{return m_engine_info;}
 		const client_info get_client_info()const{return m_client_info;}
 		zmq_reactor::reactor& get_loop(){return m_loop;}
+
+		engine_connector& get_engine(int eid);
+		engine_connector& get_engine(const std::string& queue);
+		unsigned int      get_num_engines();
 
 		void run();
 		void shutdown();

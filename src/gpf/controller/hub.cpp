@@ -292,6 +292,29 @@ void hub::dispatch_query(zmq::socket_t&s){
 	(this->*(handler->second))(incoming);
 }
 
+engine_connector& 
+hub::get_engine(int eid){
+	auto it = m_engines.find(eid);
+	if(it == m_engines.end())
+		throw unknown_engine_error() << engine_name_t(boost::lexical_cast<std::string>(eid));
+	return it->second;
+}
+engine_connector& 
+hub::get_engine(const std::string& queue){
+	auto it = m_by_ident.find(queue);
+	if(it == m_by_ident.end())
+		throw unknown_engine_error() << engine_name_t(queue);
+	int eid = it->second;
+	auto jt = m_engines.find(eid);
+	if(jt == m_engines.end())
+		throw unknown_engine_error() << engine_name_t(boost::lexical_cast<std::string>(eid));
+	return jt->second;
+}
+unsigned int      
+hub::get_num_engines(){
+	return m_engines.size();
+}
+
 hub::~hub()
 {
 }
