@@ -349,7 +349,8 @@ void hub::shutdown(){
 
 hub_factory::hub_factory(int startport)
 :m_portpool(startport),
- m_ctx(1)
+ m_ctx(1),
+ m_heartmonitor_interval_millisec(2000)
 {
 	m_hb_ports      = m_portpool.get(2);
 	m_mux_ports     = m_portpool.get(2);
@@ -387,6 +388,12 @@ hub_factory::transport(const std::string& transport){
 	return *this;
 }
 
+hub_factory&
+hub_factory::hm_interval(int millisecs){
+	m_heartmonitor_interval_millisec = millisecs;
+	return *this;
+}
+
 boost::shared_ptr<hub>
 hub_factory::get(){
 	typedef boost::shared_ptr<zmq::socket_t> zmq_socket;
@@ -418,7 +425,7 @@ hub_factory::get(){
 	zmq_socket hrep (new zmq::socket_t(m_ctx, ZMQ_ROUTER) );
 	hrep->bind(str(format(engine_iface)%m_hb_ports[1]).c_str());
 
-	m_heartmonitor.reset(new heartmonitor(m_reactor, hpub, hrep));
+	m_heartmonitor.reset(new heartmonitor(m_reactor, hpub, hrep, m_heartmonitor_interval_millisec));
 	
 
 	// client connections

@@ -172,6 +172,7 @@ namespace gpf{
 
 			hub_factory& ip(const std::string&);
 			hub_factory& transport(const std::string&);
+			hub_factory& hm_interval(int millisecs);
 
 			hub_factory(int startport);
 
@@ -180,6 +181,8 @@ namespace gpf{
 			portpool m_portpool;
 
 			zmq::context_t m_ctx;
+
+			int m_heartmonitor_interval_millisec;
 
 			// monitor
 			std::string m_monitor_transport;
