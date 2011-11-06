@@ -10,10 +10,22 @@ namespace gpf
 			engine(zmq::context_t& ctx);
 			void run(const std::string& name, const engine_info& ei);
 			inline zmq_reactor::reactor& get_loop(){ return m_reactor; }
+
+			engine& provide_service(const std::string& s);
+			void shutdown();
+			void dispatch_registration(zmq::socket_t& s); 
+			inline bool registered(){ return m_registered; }
 		private:
-			zmq::context_t&      m_ctx;
-			zmq_reactor::reactor m_reactor;
-			serialization::serializer<serialization::protobuf_archive> m_header_marshal;
+			bool                         m_registered;
+			std::string                  m_queue_name;
+			std::string                  m_heart_name;
+			std::auto_ptr<heart>         m_heart;
+			std::auto_ptr<zmq::socket_t> m_hub_registration; ///< registration communication with hub
+			std::auto_ptr<zmq::socket_t> m_queue; ///< my task queue
+			std::vector<std::string> m_services; ///< a list of services this engine provides
+			zmq::context_t&      m_ctx;          ///< reference to ZMQ context obj
+			zmq_reactor::reactor m_reactor;      ///< dispatches events
+			serialization::serializer<serialization::protobuf_archive> m_header_marshal; 
 	};
 }
 
