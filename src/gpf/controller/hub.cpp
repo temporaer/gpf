@@ -36,9 +36,9 @@ m_loop(loop)
 {
 	m_registration_timeout =  std::max(5000, 2*hm->interval());
 
-	m_loop.add(*query,    ZMQ_POLLIN, boost::bind(&hub::dispatch_query,this, _1));
-	m_loop.add(*monitor,  ZMQ_POLLIN, boost::bind(&hub::dispatch_monitor_traffic,this, _1));
-	m_loop.add(*resubmit, ZMQ_POLLIN, [=](zmq::socket_t&){});
+	m_loop.add(*m_query,    ZMQ_POLLIN, boost::bind(&hub::dispatch_query,this, _1));
+	m_loop.add(*m_monitor,  ZMQ_POLLIN, boost::bind(&hub::dispatch_monitor_traffic,this, _1));
+	m_loop.add(*m_resubmit, ZMQ_POLLIN, [=](zmq::socket_t&){});
 
 	m_monitor_handlers["in"]         = &hub::save_queue_request;
 	m_monitor_handlers["out"]        = &hub::save_queue_result;
