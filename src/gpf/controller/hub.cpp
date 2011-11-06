@@ -100,27 +100,32 @@ void hub::finish_registration(const std::string& heart){
 		LOG(ERROR) << "Trying to finish non-existent registration of heart `"<<heart<<"'";
 		return;
 	}
-	const registration_info& ri = it->second;
-	LOG(INFO)<<"Finishing registration of engine "<<ri.eid<<":`"<<ri.queue<<"'";
-	if(ri.deletion_callback)
-		ri.deletion_callback->set_inactive();
+	const engine_connector& ec = it->second;
+	LOG(INFO)<<"Finishing registration of engine "<<ec.id<<":`"<<ec.queue<<"'";
+	if(ec.deletion_callback)
+		ec.deletion_callback->set_inactive();
 
-	engine_connector ec;
-	ec.id             = ri.eid;
-	ec.queue          = ri.queue;
-	ec.registration   = ri.name;
-	ec.control        = ri.queue;
-	ec.heartbeat      = heart;
-	ec.key            = ri.queue;
-	m_engines[ri.eid] = ec;
+	m_engines[ec.id] = ec;
 
-	m_ids.insert(ri.eid);
-	m_by_ident[ri.queue] = ri.eid;
-	m_hearts[heart]   = ri.eid;
+	m_ids.insert(ec.id);
+	m_by_ident[ec.queue] = ec.id;
+	m_hearts[heart]      = ec.id;
 
-	// TODO: if self.notifier... send notification to session
+	gpf_hub::registration msg;
+	msg.set_heartbeat(ec.heartbeat);
+	msg.set_queue    (ec.queue);
+	msg.set_reg      (ec.registration);
+	BOOST_FOREACH(const std::string& s, ec.services)
+		msg.add_services(s);
+	{
+		ZmqMessage::Outgoing<ZmqMessage::XRouting> out(*m_notifier,0);
+		out << "register_engine"<<m_header_marshal(msg);
+	}{
+		ZmqMessage::Outgoing<ZmqMessage::XRouting> out(*m_query,*ec.incoming_msg,0);
+		out << "register_engine"<<"ACK";
+	}
 
-	LOG(INFO)<<"Engine connected: "<<ri.eid;
+	LOG(INFO)<<"Engine connected: "<<ec.id;
 
 }
 void hub::handle_new_heart(const std::string& heart){
@@ -149,11 +154,11 @@ void hub::handle_heart_failure(const std::string& heart){
 	_unregister_engine(heart,eid);
 }
 
-void hub::register_engine(incoming_msg_t& incoming){
+void hub::register_engine(incoming_msg_t incoming){
 	// TODO: wrap errors in a message and send them back to client
 	gpf_hub::registration msg;
 
-	if(0!=m_header_marshal.deserialize(msg,*incoming.iter_at<std::string>(1)))
+	if(0!=m_header_marshal.deserialize(msg,*incoming->iter_at<std::string>(1)))
 	        return;
 
 	std::string queue = msg.queue();
@@ -169,7 +174,7 @@ void hub::register_engine(incoming_msg_t& incoming){
 	else if(m_hearts.find(heart)!=m_hearts.end()){
 		LOG(ERROR)<<"Registration::heart id "<<msg.heartbeat()<<" in use!"; ok = false;
 	}else{
-		for(std::map<std::string, gpf::registration_info>::iterator it = m_incoming_registrations.begin();
+		for(std::map<std::string, gpf::engine_connector>::iterator it = m_incoming_registrations.begin();
 			it!= m_incoming_registrations.end(); it++){
 			if(it->first == heart){
 				LOG(ERROR)<<"Registration::heart id "<<msg.heartbeat()<<" in use!"; ok = false;
@@ -181,13 +186,17 @@ void hub::register_engine(incoming_msg_t& incoming){
 		}
 	}
 	if(ok){
-		gpf::registration_info ri;
-		ri.eid = eid;
-		ri.queue = queue;
-		//ri.name  = reg[0]; // TODO  should be part of Message!!!???
+		gpf::engine_connector ec;
+		ec.id    = eid;
+		ec.queue = queue;
+		ec.services.reserve(msg.services_size());
+		ec.incoming_msg = incoming;
+		std::copy(msg.services().begin(),msg.services().end(),std::back_inserter(ec.services));
+		ec.registration = msg.reg();
+
 		if(m_heartmonitor->alive(heart)){
 			LOG(INFO) << "heart is already beating, finish off registration";
-			m_incoming_registrations[heart] = ri;
+			m_incoming_registrations[heart] = ec;
 			finish_registration(heart);
 		}else{
 			// heart is not beating, schedule for deletion (revokable if heartbeat comes in time)
@@ -195,11 +204,10 @@ void hub::register_engine(incoming_msg_t& incoming){
 			boost::shared_ptr<deadline_timer> dt(
 				new deadline_timer(boost::posix_time::milliseconds(m_registration_timeout),
 					boost::bind(&hub::_purge_stalled_registration,this,heart)));
-			ri.deletion_callback = dt;
-			m_incoming_registrations[heart] = ri;
+			ec.deletion_callback = dt;
+			m_incoming_registrations[heart] = ec;
 			m_loop.add(dt);
 		}
-		// TODO: Send some ACK message?
 	}
 
 }
@@ -207,7 +215,7 @@ void hub::_purge_stalled_registration(const std::string& heart){
 	auto it = m_incoming_registrations.find(heart);
 	if(it == m_incoming_registrations.end())
 		return;
-	DLOG(INFO)<<"Purging stalled registration: " << it->second.eid;
+	DLOG(INFO)<<"Purging stalled registration: " << it->second.id;
 	m_incoming_registrations.erase(it);
 }
 
@@ -222,7 +230,8 @@ void hub::_unregister_engine(const std::string& heart, int eid ){
 	m_loop.add(deadline_timer(boost::posix_time::milliseconds(m_registration_timeout),
 				boost::bind(&hub::_handle_stranded_msgs, this, eid, it->second.queue)));
 
-	// TODO: if self.notifier: send notification
+	ZmqMessage::Outgoing<ZmqMessage::XRouting> out(*m_notifier,0);
+	out << "unregistration_request" << eid;
 }
 void hub::_handle_stranded_msgs(int eid, const std::string& uuid){
 	/** 
@@ -252,10 +261,10 @@ void hub::_handle_stranded_msgs(int eid, const std::string& uuid){
 void hub::dispatch_monitor_traffic(zmq::socket_t& s){
 	// all ME and Task queue messages come through here, as well as
 	// IOPub traffic.
-	ZmqMessage::Incoming<ZmqMessage::XRouting> incoming(s);
-	incoming.receive_all();
-	std::string type = ZmqMessage::get<std::string>(incoming[0]);
-	DLOG(INFO) << "Monitor traffic : "<< ZmqMessage::get<std::string>(incoming[0]);
+	incoming_msg_t incoming(new ZmqMessage::Incoming<ZmqMessage::XRouting>(s));
+	incoming->receive_all();
+	std::string type = ZmqMessage::get<std::string>((*incoming)[0]);
+	DLOG(INFO) << "Monitor traffic : "<< ZmqMessage::get<std::string>((*incoming)[0]);
 	
 	std::map<std::string,monitor_handler_t>::iterator handler = m_monitor_handlers.find(type);
 	if(handler == m_monitor_handlers.end()){
@@ -267,11 +276,12 @@ void hub::dispatch_monitor_traffic(zmq::socket_t& s){
 
 void hub::dispatch_query(zmq::socket_t&s){
 	// Route registration requests and queries from clients.
-	ZmqMessage::Incoming<ZmqMessage::XRouting> incoming(s);
-	incoming.receive_all();
+	incoming_msg_t incoming(new ZmqMessage::Incoming<ZmqMessage::XRouting>(s));
+	incoming->receive_all();
 	
-	std::string type = ZmqMessage::get<std::string>(incoming[0]);
+	std::string type = ZmqMessage::get<std::string>((*incoming)[0]);
 	std::map<std::string,query_handler_t>::iterator handler = m_query_handlers.find(type);
+	LOG(INFO) << "Incoming query: `"<<type<<"'";
 	if(handler == m_query_handlers.end()){
 		LOG(ERROR) << "Bad Message Type: "<<type;
 		return;
@@ -283,37 +293,52 @@ hub::~hub()
 {
 }
 
-void hub::nop(incoming_msg_t&){
+void hub::nop(incoming_msg_t){
 }
-void hub::save_queue_request(incoming_msg_t&){
+void hub::save_queue_request(incoming_msg_t){
 	
 }
-void hub::save_queue_result (incoming_msg_t&){
+void hub::save_queue_result (incoming_msg_t){
 	
 }
-void hub::save_task_request(incoming_msg_t&){
+void hub::save_task_request(incoming_msg_t){
 	
 }
-void hub::save_task_result(incoming_msg_t&){
+void hub::save_task_result(incoming_msg_t){
 	
 }
-void hub::save_task_destination(incoming_msg_t&){
+void hub::save_task_destination(incoming_msg_t){
 	
 }
 
-void hub::shutdown_request(incoming_msg_t&){}
+void hub::shutdown_request(incoming_msg_t){}
 void hub::_shutdown(){}
-void hub::check_load(incoming_msg_t&){}
-void hub::queue_status(incoming_msg_t&){}
-void hub::purge_results(incoming_msg_t&){}
-void hub::resubmit_task(incoming_msg_t&){}
-void hub::get_results(incoming_msg_t&){}
-void hub::db_query(incoming_msg_t&){}
-void hub::get_history(incoming_msg_t&){}
+void hub::check_load(incoming_msg_t){}
+void hub::queue_status(incoming_msg_t){}
+void hub::purge_results(incoming_msg_t){}
+void hub::resubmit_task(incoming_msg_t){}
+void hub::get_results(incoming_msg_t){}
+void hub::db_query(incoming_msg_t){}
+void hub::get_history(incoming_msg_t){}
 
-void hub::save_iopub_message(incoming_msg_t&){}
-void hub::connection_request(incoming_msg_t&){}
-void hub::unregister_engine(incoming_msg_t&){}
+void hub::save_iopub_message(incoming_msg_t){}
+void hub::connection_request(incoming_msg_t){}
+
+void hub::unregister_engine(incoming_msg_t in){
+	std::string queue = ZmqMessage::get<std::string>((*in)[1]);
+	auto it = m_by_ident.find(queue);
+	if(it == m_by_ident.end()){
+		LOG(ERROR)<<"Trying to unregister unknown engine `"<<queue<<"'";
+	}
+	int eid = it->second;
+	m_engines.erase(eid);
+	LOG(INFO)<<"Unregistring engine "<<eid<< " ("<<queue<<")";
+}
+
+void hub::shutdown(){
+	LOG(INFO)<<"Hub shutting down. #connected engines: "<<m_engines.size();
+	m_loop.shutdown();
+}
 
  /**********************************
   *         Hub Factory

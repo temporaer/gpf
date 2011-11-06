@@ -47,24 +47,17 @@ namespace gpf{
 		std::string registration; ///< ???
 		std::string control; ///< ??? from `queue'
 		std::string heartbeat; ///< heart's name
+		std::vector<std::string> services; ///< services this engine offers
 
 		// stuff littering the hub class in ipython
 		std::string key; ///< queue
 		std::vector<std::string> queues; ///< ???
 		std::vector<std::string> tasks; ///< ???
 		std::vector<std::string> completed; ///< ???
-	};
 
-	struct registration_info{
-		int               eid;  // engine id
-		std::string       queue;  // zmq socket identity
-		std::string       name;  // what the sender wants to be called
-		boost::shared_ptr<deadline_timer> deletion_callback; // should be canceled when registration succeeded with a heartbeat
+		boost::shared_ptr<ZmqMessage::Incoming<ZmqMessage::XRouting> > incoming_msg; ///< which we should reply to when done
+		boost::shared_ptr<deadline_timer> deletion_callback; ///< should be canceled when registration succeeded with a heartbeat
 	};
-
-	struct engine_state{
-	};
-
 
 	class hub
 	: boost::noncopyable
@@ -87,6 +80,7 @@ namespace gpf{
 		zmq_reactor::reactor& get_loop(){return m_loop;}
 
 		void run();
+		void shutdown();
 		
 	private:
 		void dispatch_monitor_traffic(zmq::socket_t&); // ME, IOPub and Task queue messages
@@ -96,25 +90,25 @@ namespace gpf{
 		void handle_new_heart(const std::string& heart);
 		void handle_heart_failure(const std::string& heart);
 
-		typedef ZmqMessage::Incoming<ZmqMessage::XRouting> incoming_msg_t;
+		typedef boost::shared_ptr<ZmqMessage::Incoming<ZmqMessage::XRouting> > incoming_msg_t;
 
 		// MUX Queue Traffic
-		void nop(incoming_msg_t&); // TODO: should this func recv the msg nevertheless?
-		void save_queue_request(incoming_msg_t&);
-		void save_queue_result (incoming_msg_t&);
+		void nop(incoming_msg_t); // TODO: should this func recv the msg nevertheless?
+		void save_queue_request(incoming_msg_t);
+		void save_queue_result (incoming_msg_t);
 
 		// Task Queue Traffic
-		void save_task_request(incoming_msg_t&);
-		void save_task_result(incoming_msg_t&);
-		void save_task_destination(incoming_msg_t&);
+		void save_task_request(incoming_msg_t);
+		void save_task_result(incoming_msg_t);
+		void save_task_destination(incoming_msg_t);
 
 		// IOPub traffic
-		void save_iopub_message(incoming_msg_t&);
+		void save_iopub_message(incoming_msg_t);
 
 		// registration requests
-		void connection_request(incoming_msg_t&);
-		void register_engine(incoming_msg_t&);
-		void unregister_engine(incoming_msg_t&);
+		void connection_request(incoming_msg_t);
+		void register_engine(incoming_msg_t);
+		void unregister_engine(incoming_msg_t);
 		void finish_registration(const std::string& heart);
 
 		void _handle_stranded_msgs(int eid, const std::string& uuid);
@@ -122,16 +116,16 @@ namespace gpf{
 		void _unregister_engine(const std::string& heart, int eid );
 
 		// client requests
-		void shutdown_request(incoming_msg_t&);
+		void shutdown_request(incoming_msg_t);
 		void _shutdown();
-		void check_load(incoming_msg_t&);
-		void queue_status(incoming_msg_t&);
-		void purge_results(incoming_msg_t&);
-		void resubmit_task(incoming_msg_t&);
-		//void _extract_record(incoming_msg_t&);
-		void get_results(incoming_msg_t&);
-		void db_query(incoming_msg_t&);
-		void get_history(incoming_msg_t&);
+		void check_load(incoming_msg_t);
+		void queue_status(incoming_msg_t);
+		void purge_results(incoming_msg_t);
+		void resubmit_task(incoming_msg_t);
+		//void _extract_record(incoming_msg_t);
+		void get_results(incoming_msg_t);
+		void db_query(incoming_msg_t);
+		void get_history(incoming_msg_t);
 
 		zmq_reactor::reactor&          m_loop;
 
@@ -141,8 +135,8 @@ namespace gpf{
 		boost::shared_ptr<zmq::socket_t> m_notifier;
 		boost::shared_ptr<zmq::socket_t> m_resubmit;
 
-		typedef void (hub::*monitor_handler_t)(incoming_msg_t&);
-		typedef void (hub::*query_handler_t)(incoming_msg_t&);
+		typedef void (hub::*monitor_handler_t)(incoming_msg_t);
+		typedef void (hub::*query_handler_t)(incoming_msg_t);
 		std::map<std::string,monitor_handler_t> m_monitor_handlers;
 		std::map<std::string,query_handler_t>   m_query_handlers;
 
@@ -155,7 +149,7 @@ namespace gpf{
 		std::map<int,engine_connector> m_engines;
 		std::set<std::string>          m_dead_engines;
 		std::map<std::string,int>      m_hearts;
-		std::map<std::string,registration_info>   m_incoming_registrations;
+		std::map<std::string,engine_connector>   m_incoming_registrations;
 		std::map<std::string,int>      m_by_ident;
 		std::set<int>                  m_ids;
 
