@@ -13,6 +13,12 @@ namespace gpf
 			void serialize(std::string& s, const T& msg){
 				archive_type_traits<atype>::serialize(s,msg);
 			}
+			template<class T>
+			std::string operator()(const T& msg){
+				std::string s;
+				archive_type_traits<atype>::serialize(s,msg);
+				return s;
+			}
 
 			template<class T>
 			int deserialize(T& msg, const std::string& s){
