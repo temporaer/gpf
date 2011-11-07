@@ -108,12 +108,15 @@ void hub::finish_registration(const std::string& heart){
 	msg.set_heartbeat(ec.heartbeat);
 	msg.set_queue    (ec.queue);
 	msg.set_reg      (ec.registration);
+	msg.set_eid      (ec.id);
 	BOOST_FOREACH(const std::string& s, ec.services)
 		msg.add_services(s);
 	{
+		// notify others that new engine is registered
 		ZmqMessage::Outgoing<ZmqMessage::XRouting> out(*m_notifier,0);
-		out << "registration_request"<<m_header_marshal(msg);
+		out << "registration_notification"<<m_header_marshal(msg);
 	}{
+		// notify engine that it is registered
 		ZmqMessage::Outgoing<ZmqMessage::XRouting> out(*m_query,*ec.incoming_msg,0);
 		out << "registration_request"<<"ACK";
 	}
@@ -225,7 +228,7 @@ void hub::_unregister_engine( int eid ){
 				boost::bind(&hub::_handle_stranded_msgs, this, eid, it->queue)));
 
 	ZmqMessage::Outgoing<ZmqMessage::XRouting> out(*m_notifier,0);
-	out << "unregistration_request" << eid;
+	out << "unregistration_notification" << eid;
 }
 void hub::_handle_stranded_msgs(int eid, const std::string& uuid){
 	/** 
@@ -454,7 +457,7 @@ void hub::shutdown_request(incoming_msg_t incoming){
 		}
 		{
 			ZmqMessage::Outgoing<ZmqMessage::XRouting> out(*m_notifier,0);
-			out <<"shutdown_notice"<<ZmqMessage::Flush;
+			out <<"shutdown_notification"<<ZmqMessage::Flush;
 	
 			deadline_timer dt(boost::posix_time::milliseconds(1000),
 					boost::bind(&hub::_shutdown,this));

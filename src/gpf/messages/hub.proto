@@ -8,6 +8,7 @@ message registration{
   required string queue     = 2;
   optional string reg       = 3;
   repeated string services  = 4;
+  optional int32       eid  = 5;
 }
 
 ///////////////////////
