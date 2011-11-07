@@ -3,6 +3,7 @@ INCLUDE_DIRECTORIES(${CMAKE_BINARY_DIR}/src)
 
 ADD_LIBRARY(gpf SHARED 
 	controller/hub.cpp
+	controller/hub_factory.cpp
 	controller/heartmonitor.cpp
 	controller/engine_set.cpp
 	client/client.cpp
