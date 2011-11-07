@@ -19,6 +19,7 @@
 #include <gpf/messages/hub.pb.h>
 #include <gpf/except.hpp>
 #include <gpf/controller/engine_set.hpp>
+#include <gpf/controller/task_set.hpp>
 
 namespace gpf{
 
@@ -113,8 +114,6 @@ namespace gpf{
 		void resubmit_task(incoming_msg_t);
 		//void _extract_record(incoming_msg_t);
 		void get_results(incoming_msg_t);
-		void db_query(incoming_msg_t);
-		void get_history(incoming_msg_t);
 
 		zmq_reactor::reactor&          m_loop;
 
@@ -136,14 +135,10 @@ namespace gpf{
 		boost::shared_ptr<heartmonitor> m_heartmonitor;
 		engine_tracker                  m_tracker;
 
-		// message-ids
-		std::set<std::string>          m_pending;
-		std::set<std::string>          m_all_completed;
-
 		engine_info                    m_engine_info;
 		client_info                    m_client_info;
 
-		dict_db<std::string,gpf_hub::task_record> m_db;
+		task_tracker                   m_ttracker;
 
 
 	};

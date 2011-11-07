@@ -1,10 +1,8 @@
 package gpf_hub;
 
-message query {
-  required string msg_id = 1;
-  required string msg_type = 2;
-}
-
+///////////////////////
+//  Registration
+///////////////////////
 message registration{
   required string heartbeat = 1;
   required string queue     = 2;
@@ -12,14 +10,111 @@ message registration{
   repeated string services  = 4;
 }
 
+///////////////////////
+//  Load
+///////////////////////
 message load_request{
   repeated int32 eid = 1;
 };
 message load_reply{
-  repeated int32 queuelen = 1;
-  repeated int32 taskslen = 2;
+  repeated int32 eid    = 1;
+  repeated int32 queuelen = 2;
+  repeated int32 taskslen = 3;
 };
 
+///////////////////////
+// Queue Status
+///////////////////////
+message queue_status_request{
+	optional bool verbose = 1 [ default=false ];
+	repeated int32 eids   = 2;
+}
+message queue_status_reply{
+	message status{
+		required int32 eid      = 1;
+		required int32 queuelen = 2;
+		required int32 taskslen = 3;
+		repeated string queues   = 4;
+		repeated string completed= 5;
+		repeated string tasks    = 6;
+	}
+	repeated status engine = 1;
+}
+
+///////////////////////
+// Purge Results
+///////////////////////
+message purge_results_request{
+	optional bool  all      =1;
+	repeated string msg_ids  =2;
+	repeated int32 eids     =3;
+}
+message purge_results_reply{
+	optional bool ok    =1 [default=true];
+}
+
+///////////////////////
+// Get Results
+///////////////////////
+message get_results_request{
+	repeated string msg_ids = 1;
+	optional bool status_only = 2 [default=false];
+}
+message get_results_reply{
+	enum Status {
+		PENDING=0;
+		COMPLETED=1;
+		UNASSIGNED=2;
+	}
+	message result {
+		required string msg_id  = 1;
+		required Status status  = 2;
+		optional string content = 3;
+	}
+	repeated result results = 1;
+}
+
+///////////////////////
+// queue in/out (Payload is a different part of multi-part message)
+///////////////////////
+message in{
+	required string msg_id    = 1;
+	required int32  eid       = 2;
+	optional string submitted = 3;
+}
+message out{
+	required string msg_id    = 1;
+	required int32  eid       = 2;
+	optional string completed = 3;
+	optional string started   = 4;
+}
+
+///////////////////////
+// task in/out (Payload is a different part of multi-part message)
+///////////////////////
+message intask{
+	required string msg_id    = 1;
+	optional int32  eid       = 2;
+	optional string submitted = 3;
+}
+message outtask{
+	required string msg_id    = 1;
+	required int32  eid       = 2;
+	optional string completed = 3;
+	optional string started   = 4;
+}
+
+///////////////////////
+// task destination
+///////////////////////
+message tracktask{
+	required string msg_id    = 1;
+	required int32     eid    = 2;
+}
+
+///////////////////////
+// Generic key-value header
+///////////////////////
 message header{
 	message key_val{
 		required string key=1;
@@ -28,6 +123,10 @@ message header{
 	repeated key_val kv =1;
 }
 
+
+///////////////////////
+// Task 
+///////////////////////
 message task_record{
 	required string msg_id =1;
 	required string client_uuid =2;
