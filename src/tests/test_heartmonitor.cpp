@@ -37,6 +37,9 @@ TEST(heartmonitor_test, init){
 	boost::thread t_d(&body::run, &d);
 
 	// turn off after 10 seconds
+	loop.add(gpf::deadline_timer(boost::posix_time::milliseconds(2100), boost::bind(&gpf::heart::shutdown, &b.heart)));
+	loop.add(gpf::deadline_timer(boost::posix_time::milliseconds(2100), boost::bind(&gpf::heart::shutdown, &c.heart)));
+	loop.add(gpf::deadline_timer(boost::posix_time::milliseconds(2100), boost::bind(&gpf::heart::shutdown, &d.heart)));
 	loop.add(gpf::deadline_timer(boost::posix_time::milliseconds(2200), boost::bind(&loop_type::shutdown, &loop)));
 
 	loop.run();
