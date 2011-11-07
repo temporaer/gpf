@@ -12,6 +12,14 @@ message registration{
   repeated string services  = 4;
 }
 
+message load_request{
+  repeated int32 eid = 1;
+};
+message load_reply{
+  repeated int32 queuelen = 1;
+  repeated int32 taskslen = 2;
+};
+
 message header{
 	message key_val{
 		required string key=1;

@@ -337,7 +337,25 @@ void hub::save_task_destination(incoming_msg_t){
 
 void hub::shutdown_request(incoming_msg_t){}
 void hub::_shutdown(){}
-void hub::check_load(incoming_msg_t){}
+void hub::check_load(incoming_msg_t incoming){
+	gpf_hub::load_request inmsg;
+	gpf_hub::load_reply   outmsg;
+	if(0!=m_header_marshal.deserialize(inmsg,*incoming->iter_at<std::string>(1)))
+	        return;
+	auto& index = m_tracker.engines.get<engine_id_t>();
+	bool ok = true;
+	for(int i=0;i<inmsg.eid_size();i++){
+		auto it = index.find(inmsg.eid(i));
+		if(it==index.end()) {
+			ok = false;
+			break;
+		}
+		outmsg.add_queuelen(it->queues.size());
+		outmsg.add_taskslen(it->tasks.size());
+	}
+	ZmqMessage::Outgoing<ZmqMessage::XRouting> out(*m_query,*incoming,0);
+	out << "load_reply"<<m_header_marshal(outmsg);
+}
 void hub::queue_status(incoming_msg_t){}
 void hub::purge_results(incoming_msg_t){}
 void hub::resubmit_task(incoming_msg_t){}
