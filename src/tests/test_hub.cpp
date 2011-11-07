@@ -3,22 +3,26 @@
 #include <boost/bind.hpp>
 #include <boost/thread.hpp>
 #include <gpf/controller/hub.hpp>
+#include <gpf/controller/hub_factory.hpp>
 #include <gpf/engine/engine.hpp>
 
 TEST(hub_test, hub_init){
 	gpf::hub_factory hf(5000);
 	hf.ip("127.0.0.1").transport("tcp");
-	hf.get();
+	EXPECT_NO_THROW(hf.get());
 }
 
 template<class T>
 void schedule_reactor_shutdown(int ms, T& t){
+	// when the reactor shuts down, the objects in that thread remain in
+	// the state they were at that time
 	t.get_loop().add(gpf::deadline_timer(boost::posix_time::milliseconds(ms),
 				boost::bind(&zmq_reactor::reactor::shutdown,&t.get_loop())));
 }
 
 template<class T>
 void schedule_obj_shutdown(int ms, T& t){
+	// when the object shuts down, it may for example de-register itself
 	t.get_loop().add(gpf::deadline_timer(boost::posix_time::milliseconds(ms),
 				boost::bind(&T::shutdown,&t)));
 }
@@ -60,7 +64,7 @@ TEST(hub_test, engine_init){
 	 ****/
 
 	schedule_reactor_shutdown(200, *hub);
-	schedule_obj_shutdown(100, engine);
+	schedule_obj_shutdown(100, engine); // engine will shut down after half the time
 
 	boost::thread engine_thread2([&](){engine.get_loop().run();});
 
