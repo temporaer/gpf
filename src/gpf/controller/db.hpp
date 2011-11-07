@@ -34,9 +34,6 @@ namespace gpf
 				//std::vector<google::protobuf::FieldDescriptor*> fds;
 				//r->ListFields(&v,&fds);
 			}
-
-
-			
 	};
 	
 }
