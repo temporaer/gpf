@@ -39,7 +39,7 @@ engine::run(const std::string& name, const engine_info& ei){
 	// say hello to the hub
 	LOG_IF(FATAL,!validate_url(ei.hub_registration));
 	m_hub_registration.reset(new zmq::socket_t (m_ctx, ZMQ_REQ));
-	m_reactor.add(*m_hub_registration,    ZMQ_POLLIN, boost::bind(&engine::dispatch_registration,this, _1));
+	m_reactor.add(m_hub_registration,    ZMQ_POLLIN, boost::bind(&engine::dispatch_registration,this, _1));
 	m_hub_registration->connect(ei.hub_registration.c_str());
 	ZmqMessage::Outgoing<ZmqMessage::SimpleRouting> out(*m_hub_registration,0);
 	gpf_hub::registration msg;

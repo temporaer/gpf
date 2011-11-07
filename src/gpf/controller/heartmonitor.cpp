@@ -33,7 +33,10 @@ heart::heart(const std::string& in_addr, const std::string& out_addr,
 }
 
 void 
-heart::bumm(zmq::socket_t& sub, zmq::socket_t* rep){
+heart::bumm(zmq::socket_t& sub, boost::weak_ptr<zmq::socket_t> rep_){
+	if(rep_.expired())
+		return;
+	boost::shared_ptr<zmq::socket_t> rep = rep_.lock();
 	m_count ++;
 	ZmqMessage::Incoming<ZmqMessage::SimpleRouting> in(sub);
 	in.receive_all();
@@ -46,23 +49,23 @@ heart::bumm(zmq::socket_t& sub, zmq::socket_t* rep){
 
 void 
 heart::operator()(){
-	zmq::socket_t sub(m_ctx, m_in_type);
-	zmq::socket_t rep(m_ctx, m_out_type);
+	boost::shared_ptr<zmq::socket_t> sub( new zmq::socket_t(m_ctx, m_in_type) );
+	boost::shared_ptr<zmq::socket_t> rep( new zmq::socket_t(m_ctx, m_out_type) );
 	LOG_IF(FATAL,!validate_url(m_out_addr));
 	LOG_IF(FATAL,!validate_url(m_in_addr));
-	rep.connect(m_out_addr.c_str());
-	sub.connect(m_in_addr.c_str());
+	rep->connect(m_out_addr.c_str());
+	sub->connect(m_in_addr.c_str());
 	if(m_in_type==ZMQ_SUB)
-		sub.setsockopt(ZMQ_SUBSCRIBE, "", 0);
+		sub->setsockopt(ZMQ_SUBSCRIBE, "", 0);
 
 	if(m_id.size()==0)
 		m_id = boost::lexical_cast<std::string>(boost::uuids::random_generator()());
 
-	rep.setsockopt(ZMQ_IDENTITY, m_id.c_str(), m_id.size());
+	rep->setsockopt(ZMQ_IDENTITY, m_id.c_str(), m_id.size());
 
 	VLOG(2)<<"Heart:: Heart `"<<m_id<<"' running.";
 	
-	m_loop.add(sub, ZMQ_POLLIN, boost::bind(&heart::bumm,this,_1,&rep));
+	m_loop.add(sub, ZMQ_POLLIN, boost::bind(&heart::bumm,this,_1,boost::weak_ptr<zmq::socket_t>(rep)));
 
 	try{
 		m_loop.run();
@@ -84,7 +87,7 @@ heartmonitor::heartmonitor(heartmonitor::loop_type& loop, boost::shared_ptr<zmq:
 ,m_tic      (microsec_clock::universal_time())
 ,m_last_ping(microsec_clock::universal_time())
 {
-	loop.add(*m_router,ZMQ_POLLIN, boost::bind(&heartmonitor::handle_pong,this, _1)); // register w/ loop
+	loop.add(m_router,ZMQ_POLLIN, boost::bind(&heartmonitor::handle_pong,this, _1)); // register w/ loop
 
 	m_pub   ->setsockopt(ZMQ_IDENTITY, "heartMonitor_pub",strlen("heartMonitor_pub"));
 	m_router->setsockopt(ZMQ_IDENTITY, "heartMonitor_rout",strlen("heartMonitor_rout"));

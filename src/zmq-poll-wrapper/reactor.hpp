@@ -60,6 +60,7 @@ namespace zmq_reactor
 		struct reactor
 		{
 			typedef zmq::socket_t   socket_t;
+			typedef boost::shared_ptr<socket_t>   socket_ptr;
 			typedef boost::function<void (socket_t&)>        socket_activity_callback_t;
 			typedef boost::function<void (reactor*)>         timeout_callback_t;
 
@@ -69,10 +70,10 @@ namespace zmq_reactor
 			void add(boost::shared_ptr<gpf::deadline_timer> dt){
 			       	m_timer_queue.queue.push(dt);
 			}
-			bool add(socket_t& v, short event, socket_activity_callback_t cb, bool checkIfSocketAddedTwice = true)
+			bool add(socket_ptr v, short event, socket_activity_callback_t cb, bool checkIfSocketAddedTwice = true)
 			{
 				zmq_pollitem_t item = {0,0,0,0};
-				set(v, item);
+				set(*v, item);
 				item.events = event;
 				return addImpl(item, v, cb, checkIfSocketAddedTwice);
 			}
@@ -81,7 +82,7 @@ namespace zmq_reactor
 					m_pre_receive_callbacks.push_back(cb);
 				return true;
 			}
-			bool remove(socket_t& v)
+			bool remove(socket_ptr v)
 			{
 				return removeImpl(v);
 			}
@@ -107,7 +108,7 @@ namespace zmq_reactor
 				}
 				// socket fired
 
-				std::vector<socket_t*>::iterator skit = socks_.begin();
+				std::vector<socket_ptr>::iterator skit = socks_.begin();
 				std::vector<socket_activity_callback_t>::iterator cit        = m_callbacks.begin(); // outside "for" to keep VS2010 happy
 				std::vector<zmq_pollitem_t>::iterator it     = items_.begin();      // keep clang happy
 				for (; it != items_.end(); ++it, ++cit, ++skit)
@@ -115,7 +116,7 @@ namespace zmq_reactor
 					if (it->revents & it->events)
 					{	
 						socket_activity_callback_t& cb = *cit;
-						socket_t* v    = *skit;
+						socket_ptr& v    = *skit;
 
 						BOOST_FOREACH(socket_activity_callback_t& cb, m_pre_receive_callbacks){
 							cb(*v);
@@ -128,20 +129,20 @@ namespace zmq_reactor
 
 			private:
 			template <class K, class TT>
-				static int getIndex(const K& k, TT* t)
+				static int getIndex(const K& k, boost::shared_ptr<TT>& t)
 				{
-					typename std::vector<TT*>::const_iterator it = std::find( k.begin(), k.end(), t );
+					typename std::vector<boost::shared_ptr<TT> >::const_iterator it = std::find( k.begin(), k.end(), t );
 					return it == k.end() ? -1 : it - k.begin();
 				}
 
-			bool addImpl(zmq_pollitem_t& item, socket_t& v, socket_activity_callback_t cb, bool checkIfSocketAddedTwice)
+			bool addImpl(zmq_pollitem_t& item, socket_ptr v, socket_activity_callback_t cb, bool checkIfSocketAddedTwice)
 			{
 				//if added twice it hangs
-				if (checkIfSocketAddedTwice && (getIndex(socks_, &v) > -1) )
+				if (checkIfSocketAddedTwice && (getIndex(socks_, v) > -1) )
 					return false;
 				items_    .push_back(item);
 				m_callbacks.push_back(cb);
-				socks_    .push_back(&v);
+				socks_    .push_back(v);
 				return true;
 			}
 
@@ -151,9 +152,9 @@ namespace zmq_reactor
 					k.erase(k.begin() + pos);
 				}
 
-			bool removeImpl(socket_t& v)
+			bool removeImpl(socket_ptr v)
 			{
-				int pos = getIndex(socks_, &v);
+				int pos = getIndex(socks_, v);
 				if (pos == -1)
 					return false;
 				removeImpl(items_, pos);
@@ -169,7 +170,7 @@ namespace zmq_reactor
 			gpf::timer_queue                              m_timer_queue;
 
 			std::vector<socket_activity_callback_t>       m_pre_receive_callbacks;
-			std::vector<socket_t*>        socks_;
+			std::vector<socket_ptr>        socks_;
 		};
 
 }

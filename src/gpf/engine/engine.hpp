@@ -20,8 +20,8 @@ namespace gpf
 			std::string                  m_queue_name;
 			std::string                  m_heart_name;
 			std::auto_ptr<heart>         m_heart;
-			std::auto_ptr<zmq::socket_t> m_hub_registration; ///< registration communication with hub
-			std::auto_ptr<zmq::socket_t> m_queue; ///< my task queue
+			boost::shared_ptr<zmq::socket_t> m_hub_registration; ///< registration communication with hub
+			boost::shared_ptr<zmq::socket_t> m_queue; ///< my task queue
 			std::vector<std::string> m_services; ///< a list of services this engine provides
 			zmq::context_t&      m_ctx;          ///< reference to ZMQ context obj
 			zmq_reactor::reactor m_reactor;      ///< dispatches events

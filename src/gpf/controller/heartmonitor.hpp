@@ -3,6 +3,7 @@
 
 #include <set>
 #include <boost/shared_ptr.hpp>
+#include <boost/weak_ptr.hpp>
 #include <boost/function.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <zmq.hpp>
@@ -25,7 +26,7 @@ namespace gpf
 				std::string heart_id="",
 				int in_type=ZMQ_SUB, int out_type=ZMQ_DEALER);
 		void operator()();
-		void bumm(zmq::socket_t&, zmq::socket_t* );
+		void bumm(zmq::socket_t&, boost::weak_ptr<zmq::socket_t> );
 		inline long count(){ return m_count; }
 		void shutdown();
 	};
