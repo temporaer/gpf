@@ -35,17 +35,16 @@ heart::heart(const std::string& in_addr, const std::string& out_addr,
 
 void 
 heart::bumm(zmq::socket_t& sub, boost::weak_ptr<zmq::socket_t> rep_){
-	if(rep_.expired())
-		return;
-	boost::shared_ptr<zmq::socket_t> rep = rep_.lock();
-	m_count ++;
-	ZmqMessage::Incoming<ZmqMessage::SimpleRouting> in(sub);
-	in.receive_all();
-	ZmqMessage::Outgoing<ZmqMessage::XRouting> out(*rep,in,0);
-	out << m_id;
-	for (unsigned int i = 0; i < in.size(); ++i)
-		out << in[i];
-	out << ZmqMessage::Flush;
+	if(boost::shared_ptr<zmq::socket_t> rep = rep_.lock()){
+		m_count ++;
+		ZmqMessage::Incoming<ZmqMessage::SimpleRouting> in(sub);
+		in.receive_all();
+		ZmqMessage::Outgoing<ZmqMessage::XRouting> out(*rep,in,0);
+		out << m_id;
+		for (unsigned int i = 0; i < in.size(); ++i)
+			out << in[i];
+		out << ZmqMessage::Flush;
+	}
 }
 
 void 
