@@ -36,6 +36,7 @@
 #include <functional>
 #include <boost/foreach.hpp>
 #include <boost/function.hpp>
+#include <boost/bind.hpp>
 #include <algorithm>
 #include <glog/logging.h>
 #include "timer.hpp"
@@ -63,6 +64,21 @@ namespace zmq_reactor
 			typedef boost::shared_ptr<socket_t>   socket_ptr;
 			typedef boost::function<void (socket_t&)>        socket_activity_callback_t;
 			typedef boost::function<void (reactor*)>         timeout_callback_t;
+			zmq::context_t& m_ctx;
+
+			socket_ptr m_pub_internal_event;
+			socket_ptr m_sub_internal_event;
+
+			reactor(zmq::context_t& ctx)
+			:m_ctx(ctx),
+			 m_pub_internal_event(new socket_t(ctx, ZMQ_PUB)),
+			 m_sub_internal_event(new socket_t(ctx, ZMQ_SUB))
+			{
+				m_pub_internal_event->bind("inproc://reactor");
+				m_sub_internal_event->connect("inproc://reactor");
+				m_sub_internal_event->setsockopt(ZMQ_SUBSCRIBE, "", 0);
+				add(m_sub_internal_event, ZMQ_POLLIN, boost::bind(&reactor::_shutdown,this,_1));
+			}
 
 			void add(const gpf::deadline_timer& dt){
 			       	m_timer_queue.queue.push(boost::shared_ptr<gpf::deadline_timer>(new gpf::deadline_timer(dt)));
@@ -86,10 +102,16 @@ namespace zmq_reactor
 			{
 				return removeImpl(v);
 			}
-			void shutdown(){ m_stop_requested=true; }
+			void shutdown(std::string s=""){ 
+				zmq::message_t msg(s.size());
+				strncpy((char*)msg.data(), s.c_str(), s.size());
+				m_pub_internal_event->send(msg);
+			}
 			void run(long timeout = -1){
 				m_stop_requested = false;
-				while(!m_stop_requested && operator()(timeout)>=0);
+				int ret;
+				while(!m_stop_requested && (ret=operator()(timeout))>=0);
+				LOG(INFO)<<"Hub stopped, req: "<<m_stop_requested << " ret: "<<ret;
 			}
 			int operator()(long timeout = -1)
 			{
@@ -128,6 +150,13 @@ namespace zmq_reactor
 			}
 
 			private:
+			void _shutdown(zmq::socket_t& sock){
+				zmq::message_t msg;
+			       	sock.recv(&msg);
+				std::string reason((char*)msg.data(),msg.size());
+				LOG(INFO)<<"Loop shutdown requested via inproc call: "<<reason;
+				m_stop_requested = true;
+			}
 			template <class K, class TT>
 				static int getIndex(const K& k, boost::shared_ptr<TT>& t)
 				{

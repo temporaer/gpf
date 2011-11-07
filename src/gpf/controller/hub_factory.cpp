@@ -11,7 +11,8 @@ using boost::format;
 hub_factory::hub_factory(int startport)
 :m_portpool(startport),
  m_ctx(1),
- m_heartmonitor_interval_millisec(2000)
+ m_heartmonitor_interval_millisec(2000),
+ m_reactor(m_ctx)
 {
 	m_hb_ports      = m_portpool.get(2);
 	m_mux_ports     = m_portpool.get(2);

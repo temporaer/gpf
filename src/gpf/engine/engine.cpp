@@ -9,7 +9,8 @@ using namespace gpf;
 
 engine::engine(zmq::context_t& ctx)
 :m_registered(false),
- m_ctx(ctx)
+ m_ctx(ctx),
+ m_reactor(ctx)
 {
 
 }

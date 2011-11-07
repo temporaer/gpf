@@ -29,7 +29,7 @@ void stop_requester(loop_type* l){
 
 TEST(timeout_test, init){
 	zmq::context_t ctx(1);
-	loop_type loop;
+	loop_type loop(ctx);
 
 	gpf::deadline_timer dt1(milliseconds(100), handle_timeout1);
 	gpf::deadline_timer dt2(milliseconds(200), handle_timeout2);

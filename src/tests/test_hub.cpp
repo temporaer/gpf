@@ -13,11 +13,11 @@ TEST(hub_test, hub_init){
 }
 
 template<class T>
-void schedule_reactor_shutdown(int ms, T& t){
+void schedule_reactor_shutdown(int ms, T& t, std::string reason){
 	// when the reactor shuts down, the objects in that thread remain in
 	// the state they were at that time
 	t.get_loop().add(gpf::deadline_timer(boost::posix_time::milliseconds(ms),
-				boost::bind(&zmq_reactor::reactor::shutdown,&t.get_loop())));
+				boost::bind(&zmq_reactor::reactor::shutdown,&t.get_loop(), reason)));
 }
 
 template<class T>
@@ -29,7 +29,7 @@ void schedule_obj_shutdown(int ms, T& t){
 
 TEST(hub_test, engine_init){
 	gpf::hub_factory hf(5000);
-	hf.ip("127.0.0.1").transport("tcp").hm_interval(200);
+	hf.ip("127.0.0.1").transport("tcp").hm_interval(100);
 
 	boost::shared_ptr<gpf::hub> hub = hf.get();
 
@@ -38,8 +38,8 @@ TEST(hub_test, engine_init){
 	engine.provide_service("test-service1");
 	engine.provide_service("test-service2");
 
-	schedule_reactor_shutdown(500, *hub);
-	schedule_reactor_shutdown(500, engine);
+	schedule_reactor_shutdown(400, *hub, "temporary hub shutdown for testing");
+	schedule_reactor_shutdown(400, engine, "temporary engine shutdown for testing");
 
 	boost::thread engine_thread([&](){engine.run("engine0", hub->get_engine_info());});
 
@@ -63,11 +63,12 @@ TEST(hub_test, engine_init){
 	 * continue execution
 	 ****/
 
-	schedule_reactor_shutdown(200, *hub);
+	schedule_reactor_shutdown(200, *hub, "2nd temporary hub shutdown for testing");
 	schedule_obj_shutdown(100, engine); // engine will shut down after half the time
 
 	boost::thread engine_thread2([&](){engine.get_loop().run();});
 
+	LOG(INFO)<<"Running hub again until timeout...";
 	hub->run();
 	engine_thread2.join();
 

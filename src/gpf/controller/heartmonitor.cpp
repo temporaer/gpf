@@ -28,7 +28,8 @@ heart::heart(const std::string& in_addr, const std::string& out_addr,
 	m_in_type(in_type),
 	m_out_type(out_type),
 	m_ctx(1),
-	m_count(0)
+	m_count(0),
+	m_loop(m_ctx)
 {
 }
 
@@ -72,10 +73,15 @@ heart::operator()(){
 	}catch(zmq::error_t){
 		VLOG(2)<<"Heart::Stopped due to zmq shutdown";
 	}
+	VLOG(2)<<"Heart:: Heart `"<<m_id<<"' died.";
 }
 
 void heart::shutdown(){
 	m_loop.shutdown();
+}
+
+heart::~heart(){
+	shutdown();
 }
 
 heartmonitor::heartmonitor(heartmonitor::loop_type& loop, boost::shared_ptr<zmq::socket_t> pub, boost::shared_ptr<zmq::socket_t> router, int interval)

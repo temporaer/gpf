@@ -5,6 +5,7 @@ using namespace gpf;
 
 client::client(zmq::context_t& ctx)
 :m_ctx(ctx)
+,m_reactor(ctx)
 {
 }
 

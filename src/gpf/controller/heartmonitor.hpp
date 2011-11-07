@@ -29,6 +29,7 @@ namespace gpf
 		void bumm(zmq::socket_t&, boost::weak_ptr<zmq::socket_t> );
 		inline long count(){ return m_count; }
 		void shutdown();
+		~heart();
 	};
 
 	class heartmonitor{

@@ -22,7 +22,7 @@ TEST(heartmonitor_test, init){
 	typedef zmq_reactor::reactor loop_type;
 
 	zmq::context_t ctx(1);
-	loop_type loop;
+	loop_type loop(ctx);
 	boost::shared_ptr<zmq::socket_t>
 	   pub (new zmq::socket_t (ctx, ZMQ_PUB)),
 	   rep (new zmq::socket_t (ctx, ZMQ_ROUTER));
@@ -40,7 +40,7 @@ TEST(heartmonitor_test, init){
 	loop.add(gpf::deadline_timer(boost::posix_time::milliseconds(2100), boost::bind(&gpf::heart::shutdown, &b.heart)));
 	loop.add(gpf::deadline_timer(boost::posix_time::milliseconds(2100), boost::bind(&gpf::heart::shutdown, &c.heart)));
 	loop.add(gpf::deadline_timer(boost::posix_time::milliseconds(2100), boost::bind(&gpf::heart::shutdown, &d.heart)));
-	loop.add(gpf::deadline_timer(boost::posix_time::milliseconds(2200), boost::bind(&loop_type::shutdown, &loop)));
+	loop.add(gpf::deadline_timer(boost::posix_time::milliseconds(2200), boost::bind(&loop_type::shutdown, &loop, "loop shutdown")));
 
 	loop.run();
 
