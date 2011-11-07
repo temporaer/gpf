@@ -446,8 +446,24 @@ void hub::save_task_destination(incoming_msg_t incoming){
 
 }
 
-void hub::shutdown_request(incoming_msg_t){}
-void hub::_shutdown(){}
+void hub::shutdown_request(incoming_msg_t incoming){
+
+		{
+			ZmqMessage::Outgoing<ZmqMessage::XRouting> out(*m_query,0);
+			out <<"shutdown_reply"<<"ok"<<ZmqMessage::Flush;
+		}
+		{
+			ZmqMessage::Outgoing<ZmqMessage::XRouting> out(*m_notifier,0);
+			out <<"shutdown_notice"<<ZmqMessage::Flush;
+	
+			deadline_timer dt(boost::posix_time::milliseconds(1000),
+					boost::bind(&hub::_shutdown,this));
+			m_loop.add(dt);
+		}
+}
+void hub::_shutdown(){
+	exit(0);
+}
 void hub::check_load(incoming_msg_t incoming){
 	gpf_hub::load_request inmsg;
 	gpf_hub::load_reply   outmsg;
