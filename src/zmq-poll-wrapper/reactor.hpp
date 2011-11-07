@@ -35,6 +35,7 @@
 #include <vector>
 #include <functional>
 #include <boost/foreach.hpp>
+#include <boost/function.hpp>
 #include <algorithm>
 #include <glog/logging.h>
 #include "timer.hpp"

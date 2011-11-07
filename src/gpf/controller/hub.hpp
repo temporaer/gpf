@@ -18,6 +18,7 @@
 #include <gpf/controller/db.hpp>
 #include <gpf/messages/hub.pb.h>
 #include <gpf/except.hpp>
+#include <gpf/controller/engine_set.hpp>
 
 namespace gpf{
 
@@ -42,24 +43,6 @@ namespace gpf{
 		std::string notification;
 	};
 
-	struct engine_connector{
-		int id; ///< engine id
-		std::string queue; ///< zmq socket identity
-		std::string registration; ///< ???
-		std::string control; ///< ??? from `queue'
-		std::string heartbeat; ///< heart's name
-		std::vector<std::string> services; ///< services this engine offers
-
-		// stuff littering the hub class in ipython
-		std::string key; ///< queue
-		std::vector<std::string> queues; ///< ???
-		std::vector<std::string> tasks; ///< ???
-		std::vector<std::string> completed; ///< ???
-
-		boost::shared_ptr<ZmqMessage::Incoming<ZmqMessage::XRouting> > incoming_msg; ///< which we should reply to when done
-		boost::shared_ptr<deadline_timer> deletion_callback; ///< should be canceled when registration succeeded with a heartbeat
-	};
-
 
 	class hub
 	: boost::noncopyable
@@ -81,8 +64,8 @@ namespace gpf{
 		const client_info get_client_info()const{return m_client_info;}
 		zmq_reactor::reactor& get_loop(){return m_loop;}
 
-		engine_connector& get_engine(int eid);
-		engine_connector& get_engine(const std::string& queue);
+		const engine_connector& get_engine(int eid);
+		const engine_connector& get_engine(const std::string& queue);
 		unsigned int      get_num_engines();
 
 		void run();
@@ -119,7 +102,7 @@ namespace gpf{
 
 		void _handle_stranded_msgs(int eid, const std::string& uuid);
 		void _purge_stalled_registration(const std::string& heart);
-		void _unregister_engine(const std::string& heart, int eid );
+		void _unregister_engine( int eid );
 
 		// client requests
 		void shutdown_request(incoming_msg_t);
@@ -151,13 +134,7 @@ namespace gpf{
 		int m_registration_timeout;
 
 		boost::shared_ptr<heartmonitor> m_heartmonitor;
-		int next_id();
-		std::map<int,engine_connector> m_engines;
-		std::set<std::string>          m_dead_engines;
-		std::map<std::string,int>      m_hearts;
-		std::map<std::string,engine_connector>   m_incoming_registrations;
-		std::map<std::string,int>      m_by_ident;
-		std::set<int>                  m_ids;
+		engine_tracker                  m_tracker;
 
 		// message-ids
 		std::set<std::string>          m_pending;

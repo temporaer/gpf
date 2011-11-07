@@ -87,20 +87,17 @@ void hub::run(){
 	m_loop.run();
 }
 
-int hub::next_id(){
-	static int id = 0;
-	return id++;
-}
 void hub::finish_registration(const std::string& heart){
 	// Second half of engine registration, called after our HeartMonitor
 	// has received a beat from the Engine's Heart.
 	
-	auto it = m_incoming_registrations.find(heart);
-	if(it == m_incoming_registrations.end()) {
+	auto& index = m_tracker.incoming_registrations.get<heart_name_t>();
+	auto it = index.find(heart);
+	if(it == index.end()) {
 		LOG(ERROR) << "Trying to finish non-existent registration of heart `"<<heart<<"'";
 		return;
 	}
-	const engine_connector& ec = it->second;
+	const engine_connector& ec = *it;
 
 	std::stringstream ss;
 	std::copy(ec.services.begin(),ec.services.end(),std::ostream_iterator<std::string>(ss,", "));
@@ -108,11 +105,7 @@ void hub::finish_registration(const std::string& heart){
 	if(ec.deletion_callback)
 		ec.deletion_callback->set_inactive();
 
-	m_engines[ec.id] = ec;
-
-	m_ids.insert(ec.id);
-	m_by_ident[ec.queue] = ec.id;
-	m_hearts[heart]      = ec.id;
+	m_tracker.engines.insert(ec);
 
 	gpf_hub::registration msg;
 	msg.set_heartbeat(ec.heartbeat);
@@ -133,7 +126,8 @@ void hub::finish_registration(const std::string& heart){
 }
 void hub::handle_new_heart(const std::string& heart){
 	DLOG(INFO) << "Handle new heart `"<<heart<<"'";
-	if(m_incoming_registrations.find(heart)==m_incoming_registrations.end())
+	auto& index = m_tracker.incoming_registrations.get<heart_name_t>();
+	if(index.find(heart)==index.end())
 	{
 		LOG(INFO) << "Ignoring new heart `"<<heart<<"'";
 	}else{
@@ -148,13 +142,13 @@ void hub::handle_heart_failure(const std::string& heart){
 	 * triggers unregistration.
 	 */
 	DLOG(INFO)<<"Hub::Handle heart failure for heart `"<<heart<<"'";
-	auto hearts_id = m_hearts.find(heart);
-	if(hearts_id == m_hearts.end()){
+	auto& index = m_tracker.engines.get<heart_name_t>();
+	auto it = index.find(heart);
+	if(it == index.end()){
 		LOG(INFO) << "Hub:: ignoring heart failure";
 		return;
 	}
-	int eid = hearts_id->second;
-	_unregister_engine(heart,eid);
+	_unregister_engine(it->id);
 }
 
 void hub::register_engine(incoming_msg_t incoming){
@@ -167,71 +161,71 @@ void hub::register_engine(incoming_msg_t incoming){
 	std::string queue = msg.queue();
 	std::string heart = msg.heartbeat();
 
-	int eid = next_id();
+	int eid = m_tracker.next_id();
 	DLOG(INFO)<<"Registration::register_engine "<<eid<<" "<<queue<<" "<<" "<<heart;
 
-	bool ok = true;
-	if(m_by_ident.find(queue) != m_by_ident.end()) {
-		LOG(ERROR)<<"Registration::queue id "<<msg.queue()<<" in use!"; ok = false;
+	auto& heart_index = m_tracker.engines.get<heart_name_t>();
+	auto& queue_index = m_tracker.engines.get<queue_name_t>();
+	auto& heart_index2 = m_tracker.incoming_registrations.get<heart_name_t>();
+	auto& queue_index2 = m_tracker.incoming_registrations.get<queue_name_t>();
+	if(queue_index.find(queue) != queue_index.end()) {
+		LOG(ERROR)<<"Registration::queue id "<<msg.queue()<<" in use!"; return;
 	}
-	else if(m_hearts.find(heart)!=m_hearts.end()){
-		LOG(ERROR)<<"Registration::heart id "<<msg.heartbeat()<<" in use!"; ok = false;
-	}else{
-		for(std::map<std::string, gpf::engine_connector>::iterator it = m_incoming_registrations.begin();
-			it!= m_incoming_registrations.end(); it++){
-			if(it->first == heart){
-				LOG(ERROR)<<"Registration::heart id "<<msg.heartbeat()<<" in use!"; ok = false;
-				break;
-			}else if(it->second.queue == queue){
-				LOG(ERROR)<<"Registration::queue id "<<msg.queue()<<" in use!"; ok = false;
-				break;
-			}
-		}
+	else if(heart_index.find(heart)!=heart_index.end()){
+		LOG(ERROR)<<"Registration::heart id "<<msg.heartbeat()<<" in use!"; return;
 	}
-	if(ok){
-		gpf::engine_connector ec;
-		ec.id    = eid;
-		ec.queue = queue;
-		ec.services.reserve(msg.services_size());
-		ec.incoming_msg = incoming;
-		std::copy(msg.services().begin(),msg.services().end(),std::back_inserter(ec.services));
-		ec.registration = msg.reg();
+	else if(queue_index2.find(queue) != queue_index2.end()) {
+		LOG(ERROR)<<"Registration::queue id "<<msg.queue()<<" in use!"; return;
+	}
+	else if(heart_index2.find(heart)!=heart_index2.end()){
+		LOG(ERROR)<<"Registration::heart id "<<msg.heartbeat()<<" in use!"; return;
+	}
 
-		if(m_heartmonitor->alive(heart)){
-			LOG(INFO) << "heart is already beating, finish off registration";
-			m_incoming_registrations[heart] = ec;
-			finish_registration(heart);
-		}else{
-			// heart is not beating, schedule for deletion (revokable if heartbeat comes in time)
-			LOG(INFO) << "heart is not beating, wait for heartbeat to finish registration";
-			boost::shared_ptr<deadline_timer> dt(
-				new deadline_timer(boost::posix_time::milliseconds(m_registration_timeout),
-					boost::bind(&hub::_purge_stalled_registration,this,heart)));
-			ec.deletion_callback = dt;
-			m_incoming_registrations[heart] = ec;
-			m_loop.add(dt);
-		}
+	gpf::engine_connector ec;
+	ec.id    = eid;
+	ec.queue = queue;
+	ec.heartbeat = heart;
+	ec.services.reserve(msg.services_size());
+	ec.incoming_msg = incoming;
+	std::copy(msg.services().begin(),msg.services().end(),std::back_inserter(ec.services));
+	ec.registration = msg.reg();
+
+	if(m_heartmonitor->alive(heart)){
+		LOG(INFO) << "heart is already beating, finish off registration";
+		m_tracker.incoming_registrations.insert(ec);
+		finish_registration(heart);
+	}else{
+		// heart is not beating, schedule for deletion (revokable if heartbeat comes in time)
+		LOG(INFO) << "heart is not beating, wait for heartbeat to finish registration";
+		boost::shared_ptr<deadline_timer> dt(
+			new deadline_timer(boost::posix_time::milliseconds(m_registration_timeout),
+				boost::bind(&hub::_purge_stalled_registration,this,heart)));
+		ec.deletion_callback = dt;
+		m_tracker.incoming_registrations.insert(ec);
+		m_loop.add(dt);
 	}
 
 }
 void hub::_purge_stalled_registration(const std::string& heart){
-	auto it = m_incoming_registrations.find(heart);
-	if(it == m_incoming_registrations.end())
+	auto& index = m_tracker.incoming_registrations.get<heart_name_t>();
+	auto it = index.find(heart);
+	if(it == index.end())
 		return;
-	DLOG(INFO)<<"Purging stalled registration: " << it->second.id;
-	m_incoming_registrations.erase(it);
+	DLOG(INFO)<<"Purging stalled registration: " << it->id;
+	index.erase(it);
 }
 
-void hub::_unregister_engine(const std::string& heart, int eid ){
+void hub::_unregister_engine( int eid ){
 	// unregister an engine (due to its own request or due to heart failure)
-	auto it = m_engines.find(eid);
-	if(it == m_engines.end()){
-		LOG(ERROR)<<"Trying to unregister non-existing engine "<<heart<<" "<<eid;
+	auto& index = m_tracker.engines.get<engine_id_t>();
+	auto it = index.find(eid);
+	if(it == index.end()){
+		LOG(ERROR)<<"Trying to unregister unknown engine "<<eid;
 		return;
 	}
-	m_dead_engines.insert(it->second.queue);
+	m_tracker.dead_engines.insert(it->queue);
 	m_loop.add(deadline_timer(boost::posix_time::milliseconds(m_registration_timeout),
-				boost::bind(&hub::_handle_stranded_msgs, this, eid, it->second.queue)));
+				boost::bind(&hub::_handle_stranded_msgs, this, eid, it->queue)));
 
 	ZmqMessage::Outgoing<ZmqMessage::XRouting> out(*m_notifier,0);
 	out << "unregistration_request" << eid;
@@ -244,7 +238,14 @@ void hub::_handle_stranded_msgs(int eid, const std::string& uuid){
 	 * will go down after completing a result, and the client will be
 	 * notified that the result failed and later receive the actual result.
 	 */
-	engine_connector& ec = m_engines[eid];
+	auto& index = m_tracker.engines.get<engine_id_t>();
+	auto it    = index.find(eid);
+	if(it == index.end()){
+		LOG(ERROR)<< "Handling stranded messages for unknown eid="<<eid;
+		return;
+	}
+	
+	const engine_connector& ec = *it;
 	std::vector<std::string>& outstanding = ec.queues;
 	BOOST_FOREACH( std::string& msg_id, outstanding ){
 		m_pending.erase(msg_id);
@@ -292,27 +293,25 @@ void hub::dispatch_query(zmq::socket_t&s){
 	(this->*(handler->second))(incoming);
 }
 
-engine_connector& 
+const engine_connector& 
 hub::get_engine(int eid){
-	auto it = m_engines.find(eid);
-	if(it == m_engines.end())
+	auto& index = m_tracker.engines.get<engine_id_t>();
+	auto it = index.find(eid);
+	if(it == index.end())
 		throw unknown_engine_error() << engine_name_t(boost::lexical_cast<std::string>(eid));
-	return it->second;
+	return *it;
 }
-engine_connector& 
+const engine_connector& 
 hub::get_engine(const std::string& queue){
-	auto it = m_by_ident.find(queue);
-	if(it == m_by_ident.end())
+	auto& index = m_tracker.engines.get<queue_name_t>();
+	auto it = index.find(queue);
+	if(it == index.end())
 		throw unknown_engine_error() << engine_name_t(queue);
-	int eid = it->second;
-	auto jt = m_engines.find(eid);
-	if(jt == m_engines.end())
-		throw unknown_engine_error() << engine_name_t(boost::lexical_cast<std::string>(eid));
-	return jt->second;
+	return *it;
 }
 unsigned int      
 hub::get_num_engines(){
-	return m_engines.size();
+	return m_tracker.engines.size();
 }
 
 hub::~hub()
@@ -352,17 +351,18 @@ void hub::connection_request(incoming_msg_t){}
 
 void hub::unregister_engine(incoming_msg_t in){
 	std::string queue = ZmqMessage::get<std::string>((*in)[1]);
-	auto it = m_by_ident.find(queue);
-	if(it == m_by_ident.end()){
+	auto& index = m_tracker.engines.get<queue_name_t>();
+	auto it     = index.find(queue);
+	if(it == index.end()){
 		LOG(ERROR)<<"Trying to unregister unknown engine `"<<queue<<"'";
+		return;
 	}
-	int eid = it->second;
-	m_engines.erase(eid);
-	LOG(INFO)<<"Unregistring engine "<<eid<< " ("<<queue<<")";
+	LOG(INFO)<<"Unregistring engine "<<it->id<< " ("<<queue<<")";
+	index.erase(it);
 }
 
 void hub::shutdown(){
-	LOG(INFO)<<"Hub shutting down. #connected engines: "<<m_engines.size();
+	LOG(INFO)<<"Hub shutting down. #connected engines: "<<m_tracker.engines.size();
 	m_loop.shutdown();
 }
 
